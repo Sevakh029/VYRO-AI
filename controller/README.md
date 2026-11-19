@@ -16,6 +16,7 @@ python -m pip install -e ".[dev]"
 ## Phase status
 
 - **Phase 0:** repository skeleton and test tooling.
+- **Day 1 P2 complete:** Python dependencies and Webster/max-pressure reading notes are in the repo.
 - **Phase 1:** install SUMO first, then run `python controller\sandbox\hello_traci.py`.
 - **Phase 2:** state and action API; to be added after Phase 1.
 - **Phase 3:** Webster fixed-time plans and sandbox plan generation; to be added after Phase 2.
