@@ -11,6 +11,9 @@ dependencies = [
     "numpy>=2.0",
     "pandas>=2.2",
     "scikit-learn>=1.5",
+    "fastapi>=0.115",
+    "paho-mqtt>=2.1",
+    "uvicorn>=0.32",
 ]
 
 [project.optional-dependencies]
@@ -20,10 +23,10 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["controller/src"]
+where = ["controller/src", "backend/src"]
 
 [tool.pytest.ini_options]
-testpaths = ["controller/tests"]
+testpaths = ["controller/tests", "backend/tests"]
 addopts = "-ra"
 
 [tool.ruff]

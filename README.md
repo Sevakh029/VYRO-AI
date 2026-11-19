@@ -18,3 +18,29 @@ python -m ruff check controller/src controller/tests
 
 P2 reading and setup notes are in
 [controller/docs/day-1-reading-notes.md](controller/docs/day-1-reading-notes.md).
+
+## P3: Backend and communications
+
+Start the MQTT broker:
+
+```powershell
+docker compose up -d
+```
+
+Run the backend API:
+
+```powershell
+.venv\Scripts\Activate.ps1
+$env:PYTHONPATH = "backend/src"
+python -m uvicorn vyro_backend.app:app --host 127.0.0.1 --port 8000
+```
+
+Check it at <http://127.0.0.1:8000/health>.
+
+Run the MQTT hello-world pair in separate terminals:
+
+```powershell
+$env:PYTHONPATH = "backend/src"
+python -m vyro_backend.mqtt_subscriber
+python -m vyro_backend.hello_mqtt
+```
