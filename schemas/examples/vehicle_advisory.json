@@ -1,0 +1,6 @@
+{
+  "vehicle_id": "vehicle-1",
+  "advisory_type": "speed",
+  "message": "Reduce speed to 30 km/h",
+  "timestamp": "2026-11-20T10:00:00Z"
+}

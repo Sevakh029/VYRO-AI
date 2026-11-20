@@ -1,0 +1,10 @@
+{
+  "intersection_id": "intersection-1",
+  "phase_id": 2,
+  "time_in_phase_s": 15.5,
+  "detector_counts": {
+    "approach_north": 4,
+    "approach_south": 7
+  },
+  "timestamp": "2026-11-20T10:00:00Z"
+}
