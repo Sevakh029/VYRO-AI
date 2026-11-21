@@ -43,3 +43,14 @@ def test_multiple_topics_are_stored_independently() -> None:
         "vyro/v1/vehicle/state": b"vehicle",
         "vyro/v1/intersection/state": b"intersection",
     }
+
+
+def test_entity_messages_are_retained_independently_per_topic() -> None:
+    store = LatestMessageStore()
+    store.put("vyro/v1/vehicle/state", b"vehicle-1", "vehicle-1")
+    store.put("vyro/v1/vehicle/state", b"vehicle-2", "vehicle-2")
+
+    assert store.get_entities("vyro/v1/vehicle/state") == {
+        "vehicle-1": b"vehicle-1",
+        "vehicle-2": b"vehicle-2",
+    }

@@ -11,15 +11,22 @@ logger = logging.getLogger(__name__)
 class LatestMessageStore:
     def __init__(self) -> None:
         self._messages: dict[str, bytes] = {}
+        self._messages_by_entity: dict[str, dict[str, bytes]] = {}
         self._lock = Lock()
 
-    def put(self, topic: str, payload: bytes) -> None:
+    def put(self, topic: str, payload: bytes, entity_id: str | None = None) -> None:
         with self._lock:
             self._messages[topic] = payload
+            if entity_id is not None:
+                self._messages_by_entity.setdefault(topic, {})[entity_id] = payload
 
     def get(self, topic: str) -> bytes | None:
         with self._lock:
             return self._messages.get(topic)
+
+    def get_entities(self, topic: str) -> dict[str, bytes]:
+        with self._lock:
+            return dict(self._messages_by_entity.get(topic, {}))
 
     @property
     def latest(self) -> dict[str, bytes]:
@@ -33,7 +40,7 @@ class MQTTSubscriber:
         host: str = "127.0.0.1",
         port: int = 1883,
         topic: str = "vyro/v1/#",
-        on_message: Callable[[str, bytes], None] | None = None,
+        on_message: Callable[[str, bytes], bool | str | None] | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -90,9 +97,15 @@ class MQTTSubscriber:
             if isinstance(raw_topic, bytes)
             else str(raw_topic)
         )
-        self.store.put(topic, payload)
+        accepted = True
+        entity_id = None
         if self._on_message is not None:
-            self._on_message(topic, payload)
+            disposition = self._on_message(topic, payload)
+            accepted = disposition is not False
+            if isinstance(disposition, str):
+                entity_id = disposition
+        if accepted:
+            self.store.put(topic, payload, entity_id)
 
     def start(self) -> None:
         try:
