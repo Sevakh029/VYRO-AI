@@ -19,12 +19,20 @@ NETWORK_FILE = (
     / "yerevan"
     / "barekamutyun_kievyan.net.xml"
 )
+MULTI_PHASE_NETWORK_FILE = (
+    Path(__file__).parents[1]
+    / "osm"
+    / "yerevan"
+    / "sasuntsi_davit_tigran_mets.net.xml"
+)
 
 
-def zero_flow_demands() -> dict[tuple[str, str, int], PhaseDemandSettings]:
+def zero_flow_demands(
+    network_file: Path = NETWORK_FILE,
+) -> dict[tuple[str, str, int], PhaseDemandSettings]:
     return {
         key: PhaseDemandSettings(flow_veh_per_hour=0)
-        for key in required_phase_keys(NETWORK_FILE)
+        for key in required_phase_keys(network_file)
     }
 
 
@@ -65,6 +73,70 @@ def test_zero_flow_plan_preserves_clearance_states_and_minimum_green() -> None:
     assert [phase.attrib["duration"] for phase in clearance_phases] == ["4", "5"]
 
 
+def test_mixed_green_yellow_phases_keep_original_clearance_durations() -> None:
+    source_net = sumolib.net.readNet(str(MULTI_PHASE_NETWORK_FILE), withPrograms=True)
+    source = next(
+        (traffic_light, program_id, program)
+        for traffic_light in source_net.getTrafficLights()
+        for program_id, program in traffic_light.getPrograms().items()
+        if any(
+            ("G" in phase.state or "g" in phase.state)
+            and ("y" in phase.state or "Y" in phase.state)
+            for phase in program.getPhases()
+        )
+    )
+    traffic_light, program_id, source_program = source
+    mixed_indexes = [
+        index
+        for index, phase in enumerate(source_program.getPhases())
+        if ("G" in phase.state or "g" in phase.state)
+        and ("y" in phase.state or "Y" in phase.state)
+    ]
+
+    root = build_fixed_time_additional(
+        MULTI_PHASE_NETWORK_FILE,
+        zero_flow_demands(MULTI_PHASE_NETWORK_FILE),
+    )
+    generated_program = next(
+        program
+        for program in root.findall("tlLogic")
+        if program.get("id") == traffic_light.getID()
+        and program.get("programID") == f"webster_{program_id}"
+    )
+    generated_phases = generated_program.findall("phase")
+    source_phases = source_program.getPhases()
+
+    assert mixed_indexes
+    assert all(
+        float(generated_phases[index].attrib["duration"]) == source_phases[index].duration
+        for index in mixed_indexes
+    )
+    assert sum(float(phase.attrib["duration"]) for phase in generated_phases) == pytest.approx(
+        30
+    )
+
+
+def test_oversaturated_network_programs_respect_maximum_cycle() -> None:
+    demands = {
+        key: PhaseDemandSettings(flow_veh_per_hour=2000)
+        for key in required_phase_keys(NETWORK_FILE)
+    }
+
+    root = build_fixed_time_additional(
+        NETWORK_FILE,
+        demands,
+        min_cycle_s=30,
+        max_cycle_s=90,
+    )
+
+    assert len(root.findall("tlLogic")) == 9
+    for program in root.findall("tlLogic"):
+        cycle_length = sum(
+            float(phase.attrib["duration"]) for phase in program.findall("phase")
+        )
+        assert cycle_length == pytest.approx(90)
+
+
 def test_rejects_missing_or_extra_phase_demands() -> None:
     demands = zero_flow_demands()
     missing_key = next(iter(demands))
@@ -77,6 +149,13 @@ def test_rejects_missing_or_extra_phase_demands() -> None:
         build_fixed_time_additional(
             NETWORK_FILE,
             zero_flow_demands() | {("unknown", "0", 0): PhaseDemandSettings(0)},
+        )
+
+    with pytest.raises(ValueError, match="program_prefix"):
+        build_fixed_time_additional(
+            NETWORK_FILE,
+            zero_flow_demands(),
+            program_prefix=" ",
         )
 
 

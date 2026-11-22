@@ -114,7 +114,7 @@ def calculate_webster_plan(
         else:
             active_weights = {index: weights[index] for index in remaining_phase_indexes}
         proposed = {
-            index: remaining_green_s * active_weights[index] / total_weight
+            index: remaining_green_s * (active_weights[index] / total_weight)
             for index in remaining_phase_indexes
         }
         constrained = [

@@ -32,11 +32,15 @@ default to 1,800 vehicles/hour and 5 seconds:
 ```
 
 The snippet is illustrative; provide one record for every green phase in the
-network. Non-green clearance phases retain their original durations and states.
+network. Phases containing yellow remain unchanged as transitions, including
+mixed states where another signal link stays green. Other clearance phases keep
+their original durations and states. `flow_veh_per_hour` is the critical
+movement flow for that green phase, not a network-wide total.
 Oversaturated cycles use the configured maximum cycle; infeasible minimum-green
 or clearance requirements fail explicitly.
 
 ```powershell
+New-Item -ItemType Directory -Force simulation\plans | Out-Null
 python simulation\generate_fixed_time_plan.py `
   simulation\osm\yerevan\barekamutyun_kievyan.net.xml `
   simulation\phase_demands.json `

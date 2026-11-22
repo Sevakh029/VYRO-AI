@@ -109,6 +109,8 @@ def build_fixed_time_additional(
     program_prefix: str = "webster",
 ) -> ET.Element:
     """Build SUMO additional-file traffic-light programs without editing the network."""
+    if not program_prefix.strip():
+        raise ValueError("program_prefix must not be empty")
     network = _read_network(network_file)
     required_keys = set(_required_phase_keys(network))
     supplied_keys = set(phase_demands)
@@ -211,7 +213,9 @@ def _read_network(network_file: Path) -> Any:
 
 
 def _has_green(state: str) -> bool:
-    return "G" in state or "g" in state
+    has_green = "G" in state or "g" in state
+    has_yellow = "y" in state or "Y" in state
+    return has_green and not has_yellow
 
 
 def _copy_phases(
@@ -220,9 +224,8 @@ def _copy_phases(
     green_durations: dict[int, float],
 ) -> None:
     for index, phase in enumerate(phases):
-        duration = green_durations.get(index, phase.duration)
-        if duration is None:
-            raise ValueError(f"SUMO phase {index} is missing a duration")
+        original_duration = _phase_duration(phase, index)
+        duration = green_durations.get(index, original_duration)
         attributes = {
             "duration": _format_seconds(duration),
             "state": phase.state,
@@ -241,10 +244,22 @@ def _clearance_by_green(phases: list[Any], green_indexes: list[int]) -> dict[int
         clearance_s = 0.0
         while phase_index != next_green_index:
             if phase_index not in green_set:
-                clearance_s += phases[phase_index].duration
+                clearance_s += _phase_duration(phases[phase_index], phase_index)
             phase_index = (phase_index + 1) % len(phases)
         clearances[green_index] = clearance_s
     return clearances
+
+
+def _phase_duration(phase: Any, index: int) -> float:
+    duration = phase.duration
+    if (
+        isinstance(duration, bool)
+        or not isinstance(duration, (int, float))
+        or not math.isfinite(duration)
+        or duration <= 0
+    ):
+        raise ValueError(f"SUMO phase {index} must have a finite positive duration")
+    return float(duration)
 
 
 def _format_seconds(value: float) -> str:
