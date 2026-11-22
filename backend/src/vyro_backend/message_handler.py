@@ -5,6 +5,7 @@ from threading import Lock
 from pydantic import ValidationError
 
 from .schemas import IntersectionState, SignalCommand, VehicleState
+from .sqlite_logger import SQLiteMessageLogger
 from .websocket_manager import WebSocketManager
 
 logger = logging.getLogger(__name__)
@@ -17,8 +18,13 @@ MESSAGE_SCHEMAS = {
 
 
 class MQTTMessageHandler:
-    def __init__(self, websocket_manager: WebSocketManager) -> None:
+    def __init__(
+        self,
+        websocket_manager: WebSocketManager,
+        sqlite_logger: SQLiteMessageLogger | None = None,
+    ) -> None:
         self.websocket_manager = websocket_manager
+        self.sqlite_logger = sqlite_logger
         self._loop: asyncio.AbstractEventLoop | None = None
         self._loop_lock = Lock()
 
@@ -31,6 +37,9 @@ class MQTTMessageHandler:
             self._loop = None
 
     def __call__(self, topic: str, payload: bytes) -> bool | str:
+        if self.sqlite_logger is not None:
+            self.sqlite_logger.log_async(topic, payload)
+
         schema = MESSAGE_SCHEMAS.get(topic)
         if schema is None:
             logger.warning("Rejected MQTT message for unsupported topic %s", topic)

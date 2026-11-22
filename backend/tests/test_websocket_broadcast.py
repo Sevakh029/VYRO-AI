@@ -1,4 +1,5 @@
 import json
+import sqlite3
 
 from fastapi.testclient import TestClient
 from vyro_backend.app import app, mqtt_subscriber
@@ -14,7 +15,11 @@ def make_message(topic: str, payload: bytes):
     )()
 
 
-def test_valid_message_reaches_multiple_websocket_clients() -> None:
+def test_valid_message_reaches_multiple_websocket_clients(tmp_path, monkeypatch) -> None:
+    database = tmp_path / "websocket.db"
+    logger = mqtt_subscriber._on_message.sqlite_logger
+    monkeypatch.setattr(logger, "database_path", database)
+    monkeypatch.setattr(logger, "_initialized", False)
     message = {
         "vehicle_id": "ws-vehicle-1",
         "latitude": 40.18,
@@ -31,14 +36,24 @@ def test_valid_message_reaches_multiple_websocket_clients() -> None:
                 None,
                 make_message(VEHICLE_TOPIC, json.dumps(message).encode()),
             )
+            logger.flush(timeout=5)
 
             assert first.receive_json() == message
             assert second.receive_json() == message
             assert json.loads(mqtt_subscriber.get_latest(VEHICLE_TOPIC)) == message
             assert "ws-vehicle-1" in mqtt_subscriber.store.get_entities(VEHICLE_TOPIC)
+            with sqlite3.connect(database) as connection:
+                payload = connection.execute(
+                    "SELECT payload FROM received_messages"
+                ).fetchone()
+            assert json.loads(payload[0]) == message
 
 
-def test_invalid_message_is_not_broadcast_or_stored() -> None:
+def test_invalid_message_is_not_broadcast_or_stored(tmp_path, monkeypatch) -> None:
+    database = tmp_path / "invalid-websocket.db"
+    logger = mqtt_subscriber._on_message.sqlite_logger
+    monkeypatch.setattr(logger, "database_path", database)
+    monkeypatch.setattr(logger, "_initialized", False)
     invalid = {
         "vehicle_id": "ws-vehicle-invalid",
         "latitude": 91,
@@ -67,6 +82,7 @@ def test_invalid_message_is_not_broadcast_or_stored() -> None:
                 None,
                 make_message(VEHICLE_TOPIC, json.dumps(valid).encode()),
             )
+            logger.flush(timeout=5)
 
             assert websocket.receive_json() == valid
 
