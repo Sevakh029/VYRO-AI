@@ -7,7 +7,6 @@ from vyro_backend.message_handler import MQTTMessageHandler
 from vyro_backend.sqlite_logger import SQLiteMessageLogger
 from vyro_backend.websocket_manager import WebSocketManager
 
-
 UTC_TIMESTAMP = datetime(2026, 11, 22, 16, 30, tzinfo=UTC)
 
 

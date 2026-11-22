@@ -3,7 +3,7 @@ from vyro_backend.mqtt_subscriber import LatestMessageStore, MQTTSubscriber
 
 
 def make_message(topic: str, payload: bytes) -> mqtt.MQTTMessage:
-    message = mqtt.MQTTMessage(topic=topic)
+    message = mqtt.MQTTMessage(topic=topic.encode("utf-8"))
     message._topic = topic.encode("utf-8")
     message.payload = payload
     return message

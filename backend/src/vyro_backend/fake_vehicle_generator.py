@@ -6,6 +6,10 @@ from datetime import UTC, datetime
 from threading import Event
 
 import paho.mqtt.client as mqtt
+from paho.mqtt import MQTTException
+from paho.mqtt.enums import CallbackAPIVersion
+from paho.mqtt.properties import Properties
+from paho.mqtt.reasoncodes import ReasonCode
 
 from .schemas import VehicleState
 
@@ -25,7 +29,7 @@ class FakeVehicleGenerator:
         client: mqtt.Client | None = None,
     ) -> None:
         self._client = client or mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2,
+            CallbackAPIVersion.VERSION2,
             client_id=client_id,
         )
         self._client.on_connect = self._on_connect
@@ -44,8 +48,8 @@ class FakeVehicleGenerator:
         client: mqtt.Client,
         userdata: object,
         flags: mqtt.ConnectFlags,
-        reason_code: mqtt.ReasonCode,
-        properties: mqtt.Properties | None,
+        reason_code: ReasonCode,
+        properties: Properties | None,
     ) -> None:
         del client, userdata, flags, properties
         if reason_code.is_failure:
@@ -60,8 +64,8 @@ class FakeVehicleGenerator:
         client: mqtt.Client,
         userdata: object,
         disconnect_flags: mqtt.DisconnectFlags,
-        reason_code: mqtt.ReasonCode,
-        properties: mqtt.Properties | None,
+        reason_code: ReasonCode,
+        properties: Properties | None,
     ) -> None:
         del client, userdata, disconnect_flags, properties
         self._connected.clear()
@@ -107,7 +111,7 @@ class FakeVehicleGenerator:
                     state.model_dump_json(),
                     qos=1,
                 )
-            except (OSError, mqtt.MQTTException) as exc:
+            except (OSError, MQTTException) as exc:
                 logger.error("Failed to publish state for %s: %s", state.vehicle_id, exc)
                 continue
             if result.rc != mqtt.MQTT_ERR_SUCCESS:

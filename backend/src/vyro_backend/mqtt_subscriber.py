@@ -4,6 +4,9 @@ from collections.abc import Callable
 from threading import Lock
 
 import paho.mqtt.client as mqtt
+from paho.mqtt.enums import CallbackAPIVersion
+from paho.mqtt.properties import Properties
+from paho.mqtt.reasoncodes import ReasonCode
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +50,7 @@ class MQTTSubscriber:
         self.topic = topic
         self.store = LatestMessageStore()
         self._on_message = on_message
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        self.client = mqtt.Client(CallbackAPIVersion.VERSION2)
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_mqtt_message
@@ -58,8 +61,8 @@ class MQTTSubscriber:
         client: mqtt.Client,
         userdata: object,
         flags: mqtt.ConnectFlags,
-        reason_code: mqtt.ReasonCode,
-        properties: mqtt.Properties | None,
+        reason_code: ReasonCode,
+        properties: Properties | None,
     ) -> None:
         del userdata, flags, properties
         if reason_code.is_failure:
@@ -74,8 +77,8 @@ class MQTTSubscriber:
         client: mqtt.Client,
         userdata: object,
         disconnect_flags: mqtt.DisconnectFlags,
-        reason_code: mqtt.ReasonCode,
-        properties: mqtt.Properties | None,
+        reason_code: ReasonCode,
+        properties: Properties | None,
     ) -> None:
         del client, userdata, disconnect_flags, properties
         if reason_code.is_failure:

@@ -11,6 +11,8 @@ dependencies = [
     "numpy>=2.0",
     "pandas>=2.2",
     "scikit-learn>=1.5",
+    "sumolib>=1.24",
+    "traci>=1.24",
     "fastapi>=0.115",
     "pydantic>=2.9",
     "paho-mqtt>=2.1",
@@ -27,8 +29,11 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["controller/src", "backend/src"]
 
+[tool.pyright]
+extraPaths = ["controller/src", "backend/src"]
+
 [tool.pytest.ini_options]
-testpaths = ["controller/tests", "backend/tests"]
+testpaths = ["controller/tests", "backend/tests", "simulation/tests"]
 addopts = "-ra"
 
 [tool.ruff]

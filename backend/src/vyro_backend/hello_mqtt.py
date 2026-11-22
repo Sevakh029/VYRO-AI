@@ -2,6 +2,7 @@ import argparse
 import time
 
 import paho.mqtt.client as mqtt
+from paho.mqtt.enums import CallbackAPIVersion
 
 
 def main() -> None:
@@ -11,7 +12,7 @@ def main() -> None:
     parser.add_argument("--topic", default="vyro/v1/hello")
     args = parser.parse_args()
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = mqtt.Client(CallbackAPIVersion.VERSION2)
     client.connect(args.host, args.port)
     client.loop_start()
     time.sleep(0.1)

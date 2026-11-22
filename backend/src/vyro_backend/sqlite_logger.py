@@ -1,11 +1,11 @@
 import json
 import logging
 import sqlite3
+from collections.abc import Callable
 from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
-from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,9 @@ class SQLiteMessageLogger:
                     """,
                     (topic, sqlite3.Binary(payload), received_at, schema_version),
                 )
-                return int(cursor.lastrowid)
+                if cursor.lastrowid is None:
+                    raise RuntimeError("SQLite did not return an ID for the inserted message")
+                return cursor.lastrowid
         except sqlite3.Error as exc:
             self.last_error = str(exc)
             logger.exception("Failed to persist MQTT message from topic %s", topic)

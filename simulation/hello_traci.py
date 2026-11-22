@@ -1,20 +1,25 @@
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
+from typing import Any
 
-sumo_home_value = os.environ.get("SUMO_HOME")
-if not sumo_home_value:
-    raise RuntimeError("SUMO_HOME is not set.")
 
-sys.path.insert(0, str(Path(sumo_home_value) / "tools"))
-import traci
+def _load_traci(sumo_home: Path) -> Any:
+    sys.path.insert(0, str(sumo_home / "tools"))
+    import traci
+
+    return traci
 
 
 SIMULATION_SECONDS = 100
 
 
 def main() -> None:
+    sumo_home_value = os.environ.get("SUMO_HOME")
+    if not sumo_home_value:
+        raise RuntimeError("SUMO_HOME is not set.")
     sumo_home = Path(sumo_home_value)
+    traci = _load_traci(sumo_home)
     sumo_gui = sumo_home / "bin" / "sumo-gui.exe"
     example = sumo_home / "tools" / "game" / "cross"
     network = example / "cross.net.xml"

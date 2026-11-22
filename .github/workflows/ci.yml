@@ -17,4 +17,4 @@ jobs:
       - name: Test
         run: python -m pytest
       - name: Lint
-        run: python -m ruff check controller/src controller/tests backend/src backend/tests
+        run: python -m ruff check controller/src controller/tests backend/src backend/tests simulation

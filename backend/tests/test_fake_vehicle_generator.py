@@ -3,6 +3,9 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import paho.mqtt.client as mqtt
+from paho.mqtt import MQTTException
+from paho.mqtt.packettypes import PacketTypes
+from paho.mqtt.reasoncodes import ReasonCode
 from vyro_backend.fake_vehicle_generator import (
     PUBLISH_INTERVAL_SECONDS,
     VEHICLE_COUNT,
@@ -23,12 +26,15 @@ class FakeMQTTClient:
         self.on_disconnect = None
         self.published: list[tuple[str, str, int]] = []
         self.publish_result = mqtt.MQTT_ERR_SUCCESS
+        self.publish_exception: Exception | None = None
 
     def reconnect_delay_set(self, min_delay: int, max_delay: int) -> None:
         del min_delay, max_delay
 
     def publish(self, topic: str, payload: str, qos: int) -> FakePublishInfo:
         self.published.append((topic, payload, qos))
+        if self.publish_exception is not None:
+            raise self.publish_exception
         return FakePublishInfo(self.publish_result)
 
 
@@ -78,14 +84,26 @@ def test_publish_failure_is_reported_and_does_not_stop_remaining_states(
     assert "Failed to publish state" in caplog.text
 
 
+def test_paho_exception_during_publish_is_reported_and_does_not_stop_cycle(
+    caplog,
+) -> None:
+    generator, client = connected_generator()
+    client.publish_exception = MQTTException("broker unavailable")
+
+    assert generator.publish_once() == 0
+
+    assert len(client.published) == VEHICLE_COUNT
+    assert "broker unavailable" in caplog.text
+
+
 def test_disconnection_skips_publish_until_reconnected() -> None:
     generator, client = connected_generator()
     generator._on_disconnect(
-        client,
+        generator._client,
         None,
+        mqtt.DisconnectFlags(is_disconnect_packet_from_server=False),
+        ReasonCode(PacketTypes.DISCONNECT, "Unspecified error"),
         None,
-        SimpleNamespace(is_failure=True),
-        None,  # type: ignore[arg-type]
     )
 
     assert generator.publish_once() == 0
