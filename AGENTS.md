@@ -20,6 +20,9 @@ Day 1 placeholders; names must remain stable once frozen:
 - `vyro/v1/controller/command`
 - `vyro/v1/controller/ack`
 
+Schemas are frozen at v1.0. Later changes must be additive and update every
+example plus every package that consumes the schema.
+
 Use the `vyro/v1/#` namespace and JSON UTF-8 payloads.
 
 ## Conventions

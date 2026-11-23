@@ -3,17 +3,24 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel, Field
 
+from .in_memory_state import InMemoryTrafficState
 from .message_handler import MQTTMessageHandler
 from .mqtt_subscriber import MQTTSubscriber
 from .sqlite_logger import SQLiteMessageLogger
 from .websocket_manager import WebSocketManager
 
 websocket_manager = WebSocketManager()
+traffic_state = InMemoryTrafficState()
 sqlite_message_logger = SQLiteMessageLogger(
     os.getenv("VYRO_SQLITE_DB_PATH", "data/vyro_messages.db")
 )
-mqtt_message_handler = MQTTMessageHandler(websocket_manager, sqlite_message_logger)
+mqtt_message_handler = MQTTMessageHandler(
+    websocket_manager,
+    sqlite_message_logger,
+    traffic_state,
+)
 mqtt_subscriber = MQTTSubscriber(
     host=os.getenv("MQTT_HOST", "127.0.0.1"),
     port=int(os.getenv("MQTT_PORT", "1883")),
@@ -37,9 +44,30 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="VYRO Backend", version="0.1.0", lifespan=lifespan)
 
 
+class ScenarioRequest(BaseModel):
+    name: str = Field(default="normal", min_length=1, max_length=64)
+    action: str = Field(default="start", pattern="^(start|stop|reset)$")
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/state")
+async def state() -> dict[str, object]:
+    return traffic_state.snapshot()
+
+
+@app.post("/scenario")
+async def scenario(request: ScenarioRequest) -> dict[str, object]:
+    status = "stopped"
+    if request.action == "start":
+        status = "running"
+    elif request.action == "reset":
+        status = "stopped"
+    traffic_state.set_scenario(request.name, status)
+    return traffic_state.snapshot()["scenario"]
 
 
 @app.websocket("/ws")

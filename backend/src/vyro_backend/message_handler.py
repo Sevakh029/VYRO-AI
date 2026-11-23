@@ -4,6 +4,7 @@ from threading import Lock
 
 from pydantic import ValidationError
 
+from .in_memory_state import InMemoryTrafficState
 from .schemas import IntersectionState, SignalCommand, VehicleState
 from .sqlite_logger import SQLiteMessageLogger
 from .websocket_manager import WebSocketManager
@@ -22,9 +23,11 @@ class MQTTMessageHandler:
         self,
         websocket_manager: WebSocketManager,
         sqlite_logger: SQLiteMessageLogger | None = None,
+        traffic_state: InMemoryTrafficState | None = None,
     ) -> None:
         self.websocket_manager = websocket_manager
         self.sqlite_logger = sqlite_logger
+        self.traffic_state = traffic_state
         self._loop: asyncio.AbstractEventLoop | None = None
         self._loop_lock = Lock()
 
@@ -56,6 +59,13 @@ class MQTTMessageHandler:
             return False
 
         message_data = message.model_dump(mode="json")
+        if self.traffic_state is not None:
+            if isinstance(message, VehicleState):
+                self.traffic_state.receive_vehicle(message)
+            elif isinstance(message, IntersectionState):
+                self.traffic_state.receive_intersection(message)
+            elif isinstance(message, SignalCommand):
+                self.traffic_state.receive_command(message)
         with self._loop_lock:
             loop = self._loop
             if loop is not None and loop.is_running():

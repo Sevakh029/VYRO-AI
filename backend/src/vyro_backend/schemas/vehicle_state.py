@@ -10,4 +10,4 @@ class VehicleState(VYROSchema):
     speed_mps: float = Field(ge=0, allow_inf_nan=False)
     heading_deg: float = Field(default=0, ge=0, lt=360, allow_inf_nan=False)
     timestamp: UTCDateTime
-    schema_version: str = Field(default="v0.2", min_length=1, max_length=32)
+    schema_version: str = Field(default="v1.0", min_length=1, max_length=32)

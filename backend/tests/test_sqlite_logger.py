@@ -13,7 +13,7 @@ UTC_TIMESTAMP = datetime(2026, 11, 22, 16, 30, tzinfo=UTC)
 def test_database_initializes_and_stores_received_message(tmp_path) -> None:
     database = tmp_path / "messages.db"
     logger = SQLiteMessageLogger(database, received_at=lambda: UTC_TIMESTAMP)
-    payload = b'{"vehicle_id":"vehicle-1","schema_version":"v0.2"}'
+    payload = b'{"vehicle_id":"vehicle-1","schema_version":"v1.0"}'
 
     record_id = logger.log_message("vyro/v1/vehicle/state", payload)
     logger.close()
@@ -33,7 +33,7 @@ def test_database_initializes_and_stores_received_message(tmp_path) -> None:
         "vyro/v1/vehicle/state",
         payload,
         UTC_TIMESTAMP.isoformat(),
-        "v0.2",
+        "v1.0",
     )
 
 
@@ -43,7 +43,7 @@ def test_multiple_messages_and_topics_are_separate_records(tmp_path) -> None:
 
     logger.log_async(
         "vyro/v1/vehicle/state",
-        b'{"vehicle_id":"vehicle-1","schemaVersion":"v0.2"}',
+        b'{"vehicle_id":"vehicle-1","schemaVersion":"v1.0"}',
     )
     logger.log_async(
         "vyro/v1/vehicle/state",
@@ -72,11 +72,11 @@ def test_multiple_messages_and_topics_are_separate_records(tmp_path) -> None:
         "vyro/v1/vehicle/state",
         "vyro/v1/intersection/state",
     ]
-    assert bytes(rows[0][1]) == b'{"vehicle_id":"vehicle-1","schemaVersion":"v0.2"}'
+    assert bytes(rows[0][1]) == b'{"vehicle_id":"vehicle-1","schemaVersion":"v1.0"}'
     assert bytes(rows[1][1]) == b'{"vehicle_id":"vehicle-2"}'
     assert bytes(rows[2][1]) == b'{"intersection_id":"intersection-1"}'
     assert all(row[2] == UTC_TIMESTAMP.isoformat() for row in rows)
-    assert rows[0][3] == "v0.2"
+    assert rows[0][3] == "v1.0"
     assert rows[1][3] is None
 
 

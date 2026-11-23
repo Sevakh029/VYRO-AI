@@ -11,6 +11,7 @@ from paho.mqtt.enums import CallbackAPIVersion
 from paho.mqtt.properties import Properties
 from paho.mqtt.reasoncodes import ReasonCode
 
+from .publish_path import PublishPath
 from .schemas import VehicleState
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ class FakeVehicleGenerator:
         port: int = 1883,
         client_id: str = "vyro-fake-vehicle-generator",
         client: mqtt.Client | None = None,
+        publish_path: PublishPath | None = None,
     ) -> None:
         self._client = client or mqtt.Client(
             CallbackAPIVersion.VERSION2,
@@ -39,6 +41,7 @@ class FakeVehicleGenerator:
         self.port = port
         self._connected = Event()
         self._tick = 0
+        self.publish_path = publish_path or PublishPath()
         self.vehicle_ids = tuple(
             f"fake-vehicle-{index:04d}" for index in range(1, VEHICLE_COUNT + 1)
         )
@@ -81,6 +84,7 @@ class FakeVehicleGenerator:
     def stop(self) -> None:
         self._client.disconnect()
         self._client.loop_stop()
+        self.publish_path.close()
 
     def generate_states(self, timestamp: datetime | None = None) -> tuple[VehicleState, ...]:
         current_timestamp = timestamp or datetime.now(UTC)
@@ -106,13 +110,20 @@ class FakeVehicleGenerator:
         published = 0
         for state in self.generate_states():
             try:
-                result = self._client.publish(
-                    VEHICLE_STATE_TOPIC,
-                    state.model_dump_json(),
-                    qos=1,
+                result = self.publish_path.publish(
+                    lambda state=state: self._client.publish(
+                        VEHICLE_STATE_TOPIC,
+                        state.model_dump_json(),
+                        qos=1,
+                    )
                 )
             except (OSError, MQTTException) as exc:
                 logger.error("Failed to publish state for %s: %s", state.vehicle_id, exc)
+                continue
+            if result is False:
+                continue
+            if result is None:
+                published += 1
                 continue
             if result.rc != mqtt.MQTT_ERR_SUCCESS:
                 logger.error(
@@ -140,9 +151,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Publish 200 fake VYRO vehicle states at 1 Hz")
     parser.add_argument("--host", default=os.getenv("MQTT_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("MQTT_PORT", "1883")))
+    parser.add_argument("--delay-seconds", type=float, default=0.0)
+    parser.add_argument("--jitter-seconds", type=float, default=0.0)
+    parser.add_argument("--drop-probability", type=float, default=0.0)
     args = parser.parse_args()
 
-    generator = FakeVehicleGenerator(host=args.host, port=args.port)
+    publish_path = PublishPath(
+        delay_seconds=args.delay_seconds,
+        jitter_seconds=args.jitter_seconds,
+        drop_probability=args.drop_probability,
+    )
+    generator = FakeVehicleGenerator(
+        host=args.host,
+        port=args.port,
+        publish_path=publish_path,
+    )
     try:
         generator.start()
         generator.run_forever(Event())
