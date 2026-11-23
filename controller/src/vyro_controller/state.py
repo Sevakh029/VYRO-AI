@@ -19,6 +19,7 @@ class SystemState:
     time_in_phase_s: float
     detector_counts: dict[str, int]
     timestamp: datetime
+    schema_version: str = "v0.2"
 
     def __post_init__(self) -> None:
         if not isinstance(self.intersection_id, str) or not self.intersection_id.strip():
@@ -63,6 +64,7 @@ class Action:
     phase_id: int
     reason: str
     timestamp: datetime
+    schema_version: str = "v0.2"
 
     def __post_init__(self) -> None:
         if not isinstance(self.intersection_id, str) or not self.intersection_id.strip():

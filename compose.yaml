@@ -7,3 +7,23 @@ services:
     volumes:
       - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: vyro-backend
+    ports:
+      - "8000:8000"
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      VYRO_SQLITE_DB_PATH: /app/data/vyro_messages.db
+    volumes:
+      - backend-data:/app/data
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+volumes:
+  backend-data:

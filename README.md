@@ -24,7 +24,7 @@ P2 reading and setup notes are in
 Start the MQTT broker:
 
 ```powershell
-docker compose up -d
+docker compose up -d --build
 ```
 
 Run the backend API:

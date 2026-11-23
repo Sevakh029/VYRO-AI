@@ -9,3 +9,4 @@ class IntersectionState(VYROSchema):
     time_in_phase_s: float = Field(ge=0, allow_inf_nan=False)
     detector_counts: dict[str, int] = Field(default_factory=dict)
     timestamp: UTCDateTime
+    schema_version: str = Field(default="v0.2", min_length=1, max_length=32)
