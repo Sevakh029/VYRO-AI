@@ -10,6 +10,7 @@ Publish and subscribe with QoS 1.
 | `vyro/v1/controller/command` | backend -> bridge | `SignalCommand` |
 | `vyro/v1/controller/ack` | bridge -> backend | `ControllerAck` |
 | `vyro/vehicle/{pid}/advisory` | backend/agent -> vehicle/dashboard | `VehicleAdvisory` |
+| `vyro/v1/preemption/request` | controller -> bridge | `PreemptionRequest` |
 
 All schemas are frozen at v1.0. Additive changes require updating examples,
 Pydantic models, controller adapters, and affected dashboard types.

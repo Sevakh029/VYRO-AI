@@ -32,6 +32,7 @@ class FakeVehicleGenerator:
         publish_path: PublishPath | None = None,
         penetration: float = 1.0,
         seed: int = 100,
+        vehicle_type: str = "car",
     ) -> None:
         self._client = client or mqtt.Client(
             CallbackAPIVersion.VERSION2,
@@ -49,6 +50,7 @@ class FakeVehicleGenerator:
             raise ValueError("penetration must be between 0 and 1")
         self.penetration = penetration
         self._random = random.Random(seed)
+        self.vehicle_type = vehicle_type
         self.vehicle_ids = tuple(
             f"fake-vehicle-{index:04d}" for index in range(1, VEHICLE_COUNT + 1)
         )
@@ -105,6 +107,7 @@ class FakeVehicleGenerator:
                 speed_mps=(index % 25) * 0.5,
                 heading_deg=float(index % 360),
                 timestamp=current_timestamp,
+                vehicle_type=self.vehicle_type,
             )
             for index, vehicle_id in enumerate(self.vehicle_ids)
         )
@@ -167,6 +170,7 @@ def main() -> None:
     parser.add_argument("--password", default=os.getenv("MQTT_PASSWORD"))
     parser.add_argument("--penetration", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=100)
+    parser.add_argument("--vehicle-type", default="car")
     args = parser.parse_args()
 
     publish_path = PublishPath(
@@ -180,6 +184,7 @@ def main() -> None:
         publish_path=publish_path,
         penetration=args.penetration,
         seed=args.seed,
+        vehicle_type=args.vehicle_type,
     )
     if args.username is not None:
         generator._client.username_pw_set(args.username, args.password)

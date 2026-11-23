@@ -39,7 +39,11 @@ def test_valid_message_reaches_multiple_websocket_clients(tmp_path, monkeypatch)
             )
             logger.flush(timeout=5)
 
-            expected_broadcast = {**message, "schema_version": "v1.0"}
+            expected_broadcast = {
+                **message,
+                "schema_version": "v1.0",
+                "vehicle_type": "unknown",
+            }
             assert first.receive_json() == expected_broadcast
             assert second.receive_json() == expected_broadcast
             latest = mqtt_subscriber.get_latest(VEHICLE_TOPIC)
@@ -89,7 +93,11 @@ def test_invalid_message_is_not_broadcast_or_stored(tmp_path, monkeypatch) -> No
             )
             logger.flush(timeout=5)
 
-            assert websocket.receive_json() == {**valid, "schema_version": "v1.0"}
+            assert websocket.receive_json() == {
+                **valid,
+                "schema_version": "v1.0",
+                "vehicle_type": "unknown",
+            }
 
     assert mqtt_subscriber.get_latest(VEHICLE_TOPIC) == json.dumps(valid).encode()
     assert "ws-vehicle-invalid" not in mqtt_subscriber.store.get_entities(VEHICLE_TOPIC)

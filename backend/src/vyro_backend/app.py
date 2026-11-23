@@ -6,6 +6,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 from .in_memory_state import InMemoryTrafficState
+from .latency import LatencyHistogram
 from .message_handler import MQTTMessageHandler
 from .mqtt_subscriber import MQTTSubscriber
 from .sqlite_logger import SQLiteMessageLogger
@@ -13,6 +14,7 @@ from .websocket_manager import WebSocketManager
 
 websocket_manager = WebSocketManager()
 traffic_state = InMemoryTrafficState()
+command_latency = LatencyHistogram()
 sqlite_message_logger = SQLiteMessageLogger(
     os.getenv("VYRO_SQLITE_DB_PATH", "data/vyro_messages.db")
 )
@@ -59,6 +61,11 @@ async def health() -> dict[str, str]:
 @app.get("/state")
 async def state() -> dict[str, object]:
     return traffic_state.snapshot()
+
+
+@app.get("/metrics/command-latency")
+async def command_latency_metrics() -> dict[str, object]:
+    return command_latency.snapshot()
 
 
 @app.post("/scenario")

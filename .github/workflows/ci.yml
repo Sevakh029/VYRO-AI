@@ -18,3 +18,5 @@ jobs:
         run: python -m pytest
       - name: Lint
         run: python -m ruff check controller/src controller/tests backend/src backend/tests simulation
+      - name: Integration health and schema contracts
+        run: python -m pytest backend/tests/test_health.py backend/tests/test_schemas.py backend/tests/test_command_bus.py backend/tests/test_preemption.py backend/tests/test_websocket_broadcast.py

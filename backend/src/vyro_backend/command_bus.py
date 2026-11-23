@@ -1,5 +1,6 @@
 import logging
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -24,6 +25,8 @@ class CommandBus:
         self._lock = threading.Lock()
         self._timers: dict[str, threading.Timer] = {}
         self.fallback_count = 0
+        self.latency_samples_s: list[float] = []
+        self._published_at: dict[str, float] = {}
 
     def publish(self, intersection_id: str, phase_id: int, reason: str) -> SignalCommand:
         command = SignalCommand(
@@ -40,6 +43,7 @@ class CommandBus:
         with self._lock:
             self._timers[command.command_id] = timer
         timer.start()
+        self._published_at[command.command_id] = time.monotonic()
         self.publisher(command)
         return command
 
@@ -62,6 +66,9 @@ class CommandBus:
             self.acks[ack.command_id] = ack
         if timer is not None:
             timer.cancel()
+        published_at = self._published_at.pop(ack.command_id, None)
+        if published_at is not None:
+            self.latency_samples_s.append(time.monotonic() - published_at)
         if command is None:
             return False
         logger.info(

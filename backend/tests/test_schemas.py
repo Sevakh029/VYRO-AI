@@ -7,6 +7,7 @@ from vyro_backend.schemas import (
     ControllerAck,
     IntersectionState,
     MetricsSnapshot,
+    PreemptionRequest,
     SignalCommand,
     VehicleAdvisory,
     VehicleState,
@@ -73,6 +74,16 @@ UTC_TIMESTAMP = "2026-11-20T10:00:00Z"
                 "intersection_id": "intersection-1",
                 "applied": True,
                 "reason": "phase applied",
+                "timestamp": UTC_TIMESTAMP,
+            },
+        ),
+        (
+            PreemptionRequest,
+            {
+                "intersection_id": "intersection-1",
+                "vehicle_id": "ambulance-1",
+                "lead_time_s": 8.0,
+                "state": "requested",
                 "timestamp": UTC_TIMESTAMP,
             },
         ),
@@ -148,6 +159,7 @@ def test_invalid_schema_values(model: type, payload: dict) -> None:
         VehicleAdvisory,
         MetricsSnapshot,
         ControllerAck,
+        PreemptionRequest,
     ],
 )
 def test_missing_required_field_is_rejected(model: type) -> None:
@@ -164,6 +176,7 @@ def test_missing_required_field_is_rejected(model: type) -> None:
         (VehicleAdvisory, "vehicle_advisory.json"),
         (MetricsSnapshot, "metrics_snapshot.json"),
         (ControllerAck, "controller_ack.json"),
+        (PreemptionRequest, "preemption_request.json"),
     ],
 )
 def test_example_json_loads(model: type, example_name: str) -> None:
