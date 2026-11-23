@@ -26,6 +26,9 @@ class SQLiteMessageLogger:
         self.last_error: str | None = None
         self._initialized = False
         self._initialization_lock = Lock()
+        self.retention_limit = int(
+            __import__("os").getenv("VYRO_LOG_RETENTION_LIMIT", "100000")
+        )
 
     def initialize(self) -> None:
         if self._initialized:
@@ -84,6 +87,17 @@ class SQLiteMessageLogger:
                 )
                 if cursor.lastrowid is None:
                     raise RuntimeError("SQLite did not return an ID for the inserted message")
+                connection.execute(
+                    """
+                    DELETE FROM received_messages
+                    WHERE id NOT IN (
+                        SELECT id FROM received_messages
+                        ORDER BY id DESC
+                        LIMIT ?
+                    )
+                    """,
+                    (max(1, self.retention_limit),),
+                )
                 return cursor.lastrowid
         except sqlite3.Error as exc:
             self.last_error = str(exc)

@@ -44,14 +44,16 @@ class CommandBus:
         return command
 
     def publish_batch(self, commands: list[dict[str, object]]) -> list[SignalCommand]:
-        return [
-            self.publish(
-                str(command["intersection_id"]),
-                int(command["phase_id"]),
-                str(command["reason"]),
+        published: list[SignalCommand] = []
+        for command in commands:
+            published.append(
+                self.publish(
+                    str(command["intersection_id"]),
+                    int(command["phase_id"]),
+                    str(command["reason"]),
+                )
             )
-            for command in commands
-        ]
+        return published
 
     def acknowledge(self, ack: ControllerAck) -> bool:
         with self._lock:

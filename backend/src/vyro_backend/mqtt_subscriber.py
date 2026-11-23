@@ -44,6 +44,8 @@ class MQTTSubscriber:
         port: int = 1883,
         topic: str = "vyro/v1/#",
         on_message: Callable[[str, bytes], bool | str | None] | None = None,
+        username: str | None = None,
+        password: str | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -51,6 +53,8 @@ class MQTTSubscriber:
         self.store = LatestMessageStore()
         self._on_message = on_message
         self.client = mqtt.Client(CallbackAPIVersion.VERSION2)
+        if username is not None:
+            self.client.username_pw_set(username, password)
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_mqtt_message
@@ -133,9 +137,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Subscribe to VYRO MQTT messages")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=1883)
+    parser.add_argument("--username", default=None)
+    parser.add_argument("--password", default=None)
     args = parser.parse_args()
 
-    subscriber = MQTTSubscriber(host=args.host, port=args.port)
+    subscriber = MQTTSubscriber(
+        host=args.host,
+        port=args.port,
+        username=args.username,
+        password=args.password,
+    )
     subscriber.start()
     subscriber.client.loop_forever()
 

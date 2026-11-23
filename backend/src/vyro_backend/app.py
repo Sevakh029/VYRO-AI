@@ -25,6 +25,8 @@ mqtt_subscriber = MQTTSubscriber(
     host=os.getenv("MQTT_HOST", "127.0.0.1"),
     port=int(os.getenv("MQTT_PORT", "1883")),
     on_message=mqtt_message_handler,
+    username=os.getenv("MQTT_USERNAME"),
+    password=os.getenv("MQTT_PASSWORD"),
 )
 
 

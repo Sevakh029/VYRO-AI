@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import random
 import time
 from datetime import UTC, datetime
 from threading import Event
@@ -29,6 +30,8 @@ class FakeVehicleGenerator:
         client_id: str = "vyro-fake-vehicle-generator",
         client: mqtt.Client | None = None,
         publish_path: PublishPath | None = None,
+        penetration: float = 1.0,
+        seed: int = 100,
     ) -> None:
         self._client = client or mqtt.Client(
             CallbackAPIVersion.VERSION2,
@@ -42,6 +45,10 @@ class FakeVehicleGenerator:
         self._connected = Event()
         self._tick = 0
         self.publish_path = publish_path or PublishPath()
+        if not 0.0 <= penetration <= 1.0:
+            raise ValueError("penetration must be between 0 and 1")
+        self.penetration = penetration
+        self._random = random.Random(seed)
         self.vehicle_ids = tuple(
             f"fake-vehicle-{index:04d}" for index in range(1, VEHICLE_COUNT + 1)
         )
@@ -109,6 +116,8 @@ class FakeVehicleGenerator:
 
         published = 0
         for state in self.generate_states():
+            if self._random.random() > self.penetration:
+                continue
             try:
                 result = self.publish_path.publish(
                     lambda state=state: self._client.publish(
@@ -154,6 +163,10 @@ def main() -> None:
     parser.add_argument("--delay-seconds", type=float, default=0.0)
     parser.add_argument("--jitter-seconds", type=float, default=0.0)
     parser.add_argument("--drop-probability", type=float, default=0.0)
+    parser.add_argument("--username", default=os.getenv("MQTT_USERNAME"))
+    parser.add_argument("--password", default=os.getenv("MQTT_PASSWORD"))
+    parser.add_argument("--penetration", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=100)
     args = parser.parse_args()
 
     publish_path = PublishPath(
@@ -165,7 +178,11 @@ def main() -> None:
         host=args.host,
         port=args.port,
         publish_path=publish_path,
+        penetration=args.penetration,
+        seed=args.seed,
     )
+    if args.username is not None:
+        generator._client.username_pw_set(args.username, args.password)
     try:
         generator.start()
         generator.run_forever(Event())

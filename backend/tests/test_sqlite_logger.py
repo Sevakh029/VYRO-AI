@@ -142,6 +142,26 @@ def test_logger_can_reopen_after_close(tmp_path) -> None:
     logger.close()
 
 
+def test_logger_retains_only_configured_number_of_messages(tmp_path) -> None:
+    logger = SQLiteMessageLogger(tmp_path / "messages.db")
+    logger.retention_limit = 3
+
+    for index in range(5):
+        logger.log_async(
+            "vyro/v1/vehicle/state",
+            f'{{"vehicle_id":"vehicle-{index}"}}'.encode(),
+        )
+    logger.flush(timeout=5)
+
+    with sqlite3.connect(tmp_path / "messages.db") as connection:
+        rows = connection.execute(
+            "SELECT payload FROM received_messages ORDER BY id"
+        ).fetchall()
+
+    logger.close()
+    assert len(rows) == 3
+
+
 def test_message_handler_logs_before_validation_and_preserves_messages(tmp_path) -> None:
     database = tmp_path / "messages.db"
     logger = SQLiteMessageLogger(database)

@@ -1,0 +1,8 @@
+{
+  "penetration": 0.30,
+  "radius_m": 200.0,
+  "seed": 100,
+  "delay_seconds": 0.0,
+  "jitter_seconds": 0.0,
+  "drop_probability": 0.0
+}
