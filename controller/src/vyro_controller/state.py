@@ -19,7 +19,7 @@ class SystemState:
     time_in_phase_s: float
     detector_counts: dict[str, int]
     timestamp: datetime
-    schema_version: str = "v1.0"
+    schema_version: str = "v1.1"
 
     def __post_init__(self) -> None:
         if not isinstance(self.intersection_id, str) or not self.intersection_id.strip():
@@ -64,7 +64,8 @@ class Action:
     phase_id: int
     reason: str
     timestamp: datetime
-    schema_version: str = "v1.0"
+    schema_version: str = "v1.1"
+    command_id: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.intersection_id, str) or not self.intersection_id.strip():
@@ -86,3 +87,8 @@ class Action:
             raise ValueError("reason must be at most 256 characters")
         object.__setattr__(self, "reason", reason)
         _validate_utc_timestamp(self.timestamp)
+        if self.command_id is not None:
+            if not isinstance(self.command_id, str) or not self.command_id.strip():
+                raise ValueError("command_id must not be empty")
+            if len(self.command_id) > 128:
+                raise ValueError("command_id must be at most 128 characters")

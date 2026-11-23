@@ -13,6 +13,29 @@ class VehicleAgent:
         self.latest_state = state
         return state
 
+    def predict_position(
+        self,
+        horizon_s: float = 5.0,
+        route_heading_deg: float | None = None,
+    ) -> tuple[float, float]:
+        if self.latest_state is None:
+            raise ValueError("vehicle state is unavailable")
+        if not 5.0 <= horizon_s <= 10.0:
+            raise ValueError("prediction horizon must be between 5 and 10 seconds")
+        heading = route_heading_deg
+        if heading is None:
+            heading = self.latest_state.heading_deg
+        heading_radians = math.radians(heading)
+        distance_m = self.latest_state.speed_mps * horizon_s
+        latitude_delta = (distance_m * math.cos(heading_radians)) / 111_320.0
+        longitude_delta = (
+            distance_m * math.sin(heading_radians)
+        ) / (111_320.0 * max(0.1, math.cos(math.radians(self.latest_state.latitude))))
+        return (
+            self.latest_state.latitude + latitude_delta,
+            self.latest_state.longitude + longitude_delta,
+        )
+
     def neighbours(self, agents: dict[str, "VehicleAgent"], radius_m: float) -> list[str]:
         if self.latest_state is None:
             return []

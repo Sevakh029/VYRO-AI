@@ -5,16 +5,26 @@ from threading import Lock
 from pydantic import ValidationError
 
 from .in_memory_state import InMemoryTrafficState
-from .schemas import IntersectionState, SignalCommand, VehicleState
+from .schemas import (
+    ControllerAck,
+    IntersectionState,
+    SignalCommand,
+    VehicleAdvisory,
+    VehicleState,
+)
 from .sqlite_logger import SQLiteMessageLogger
+from .validation import RateLimiter, validate_vehicle_state
 from .websocket_manager import WebSocketManager
 
 logger = logging.getLogger(__name__)
+MAX_PAYLOAD_BYTES = 1_048_576
 
 MESSAGE_SCHEMAS = {
     "vyro/v1/vehicle/state": VehicleState,
     "vyro/v1/intersection/state": IntersectionState,
     "vyro/v1/controller/command": SignalCommand,
+    "vyro/v1/controller/ack": ControllerAck,
+    "vyro/v1/vehicle/+/advisory": VehicleAdvisory,
 }
 
 
@@ -28,6 +38,7 @@ class MQTTMessageHandler:
         self.websocket_manager = websocket_manager
         self.sqlite_logger = sqlite_logger
         self.traffic_state = traffic_state
+        self.rate_limiter = RateLimiter()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._loop_lock = Lock()
 
@@ -40,6 +51,12 @@ class MQTTMessageHandler:
             self._loop = None
 
     def __call__(self, topic: str, payload: bytes) -> bool | str:
+        if len(payload) > MAX_PAYLOAD_BYTES:
+            logger.warning("Rejected oversized MQTT message for topic %s", topic)
+            return False
+        if not self.rate_limiter.allow():
+            logger.warning("Rejected MQTT message for topic %s due to rate limit", topic)
+            return False
         if self.sqlite_logger is not None:
             self.sqlite_logger.log_async(topic, payload)
 
@@ -56,6 +73,9 @@ class MQTTMessageHandler:
                 topic,
                 exc.error_count(),
             )
+            return False
+        if isinstance(message, VehicleState) and not validate_vehicle_state(message):
+            logger.warning("Rejected off-network or impossible vehicle state")
             return False
 
         message_data = message.model_dump(mode="json")

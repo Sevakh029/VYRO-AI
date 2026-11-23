@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 from vyro_backend.schemas import (
+    ControllerAck,
     IntersectionState,
     MetricsSnapshot,
     SignalCommand,
@@ -62,6 +63,16 @@ UTC_TIMESTAMP = "2026-11-20T10:00:00Z"
                 "vehicle_count": 200,
                 "mean_speed_mps": 8.2,
                 "stopped_vehicle_count": 12,
+                "timestamp": UTC_TIMESTAMP,
+            },
+        ),
+        (
+            ControllerAck,
+            {
+                "command_id": "command-1",
+                "intersection_id": "intersection-1",
+                "applied": True,
+                "reason": "phase applied",
                 "timestamp": UTC_TIMESTAMP,
             },
         ),
@@ -130,7 +141,14 @@ def test_invalid_schema_values(model: type, payload: dict) -> None:
 
 @pytest.mark.parametrize(
     "model",
-    [VehicleState, IntersectionState, SignalCommand, VehicleAdvisory, MetricsSnapshot],
+    [
+        VehicleState,
+        IntersectionState,
+        SignalCommand,
+        VehicleAdvisory,
+        MetricsSnapshot,
+        ControllerAck,
+    ],
 )
 def test_missing_required_field_is_rejected(model: type) -> None:
     with pytest.raises(ValidationError):
@@ -145,6 +163,7 @@ def test_missing_required_field_is_rejected(model: type) -> None:
         (SignalCommand, "signal_command.json"),
         (VehicleAdvisory, "vehicle_advisory.json"),
         (MetricsSnapshot, "metrics_snapshot.json"),
+        (ControllerAck, "controller_ack.json"),
     ],
 )
 def test_example_json_loads(model: type, example_name: str) -> None:

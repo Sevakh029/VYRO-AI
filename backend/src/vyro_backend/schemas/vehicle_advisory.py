@@ -8,4 +8,4 @@ class VehicleAdvisory(VYROSchema):
     advisory_type: str = Field(min_length=1, max_length=64)
     message: str = Field(min_length=1, max_length=1024)
     timestamp: UTCDateTime
-    schema_version: str = Field(default="v1.0", min_length=1, max_length=32)
+    schema_version: str = Field(default="v1.1", min_length=1, max_length=32)
