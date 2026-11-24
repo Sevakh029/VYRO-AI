@@ -10,6 +10,20 @@ def test_health_endpoint() -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_dashboard_origin_is_allowed_by_cors() -> None:
+    with TestClient(app) as client:
+        response = client.options(
+            "/state",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
 def test_state_and_scenario_endpoints() -> None:
     with TestClient(app) as client:
         initial = client.get("/state")

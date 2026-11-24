@@ -7,16 +7,18 @@ from simulation.sumo_mqtt_bridge import NetworkBounds, SumoMqttBridge
 
 
 class FakePublishResult:
-    rc = 0
+    def __init__(self, rc: int = 0) -> None:
+        self.rc = rc
 
 
 class FakeMQTTClient:
     def __init__(self) -> None:
         self.published: list[tuple[str, str, int]] = []
+        self.publish_rc = 0
 
     def publish(self, topic: str, payload: str, qos: int) -> FakePublishResult:
         self.published.append((topic, payload, qos))
-        return FakePublishResult()
+        return FakePublishResult(self.publish_rc)
 
 
 class FakeVehicleAPI:
@@ -77,3 +79,23 @@ def test_bridge_publishes_valid_vehicle_state_when_connected() -> None:
     assert state.vehicle_id == "real-vehicle-1"
     assert state.speed_mps == 12.5
     assert state.heading_deg == 90
+
+
+def test_bridge_skips_publish_when_disconnected() -> None:
+    bounds = NetworkBounds(44.488, 40.202, 44.496, 40.210, 0, 0, 1000, 500)
+    client = FakeMQTTClient()
+    bridge = SumoMqttBridge(bounds, client)  # type: ignore[arg-type]
+
+    assert bridge.publish_positions(FakeTraCI()) == 0
+    assert client.published == []
+
+
+def test_bridge_counts_only_successful_mqtt_publish_results() -> None:
+    bounds = NetworkBounds(44.488, 40.202, 44.496, 40.210, 0, 0, 1000, 500)
+    client = FakeMQTTClient()
+    client.publish_rc = 4
+    bridge = SumoMqttBridge(bounds, client)  # type: ignore[arg-type]
+    bridge.connected = True
+
+    assert bridge.publish_positions(FakeTraCI()) == 0
+    assert len(client.published) == 1
