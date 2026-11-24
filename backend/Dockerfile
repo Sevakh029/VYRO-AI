@@ -6,7 +6,7 @@ COPY pyproject.toml ./
 COPY controller ./controller
 COPY backend ./backend
 
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[backend]"
 
 ENV PYTHONPATH=/app/backend/src
 

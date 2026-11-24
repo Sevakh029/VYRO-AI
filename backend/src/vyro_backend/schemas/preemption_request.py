@@ -9,4 +9,4 @@ class PreemptionRequest(VYROSchema):
     lead_time_s: float = Field(gt=0, allow_inf_nan=False)
     state: str = Field(default="requested", pattern="^(requested|granted|cleared)$")
     timestamp: UTCDateTime
-    schema_version: str = Field(default="v1.1", min_length=1, max_length=32)
+    schema_version: str = Field(default="0.2", min_length=1, max_length=32)

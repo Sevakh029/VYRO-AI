@@ -189,7 +189,7 @@ def test_example_json_loads(model: type, example_name: str) -> None:
     assert isinstance(model.model_validate(payload), model)
 
 
-def test_schema_version_defaults_to_v1_0_and_accepts_explicit_value() -> None:
+def test_schema_version_defaults_to_0_2_and_accepts_explicit_value() -> None:
     payload = {
         "vehicle_id": "vehicle-1",
         "latitude": 40.18,
@@ -199,7 +199,7 @@ def test_schema_version_defaults_to_v1_0_and_accepts_explicit_value() -> None:
     }
 
     defaulted = VehicleState.model_validate(payload)
-    explicit = VehicleState.model_validate({**payload, "schema_version": "v1.0"})
+    explicit = VehicleState.model_validate({**payload, "schema_version": "0.2"})
 
-    assert defaulted.schema_version == "v1.0"
-    assert explicit.schema_version == "v1.0"
+    assert defaulted.schema_version == "0.2"
+    assert explicit.schema_version == "0.2"

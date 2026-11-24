@@ -13,7 +13,7 @@ UTC_TIMESTAMP = datetime(2026, 11, 22, 16, 30, tzinfo=UTC)
 def test_database_initializes_and_stores_received_message(tmp_path) -> None:
     database = tmp_path / "messages.db"
     logger = SQLiteMessageLogger(database, received_at=lambda: UTC_TIMESTAMP)
-    payload = b'{"vehicle_id":"vehicle-1","schema_version":"v1.0"}'
+    payload = b'{"vehicle_id":"vehicle-1","schema_version":"0.2"}'
 
     record_id = logger.log_message("vyro/v1/vehicle/state", payload)
     logger.close()
@@ -33,7 +33,7 @@ def test_database_initializes_and_stores_received_message(tmp_path) -> None:
         "vyro/v1/vehicle/state",
         payload,
         UTC_TIMESTAMP.isoformat(),
-        "v1.0",
+        "0.2",
     )
 
 

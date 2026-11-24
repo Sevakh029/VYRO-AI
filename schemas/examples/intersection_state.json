@@ -1,5 +1,5 @@
 {
-  "schema_version": "v1.0",
+  "schema_version": "0.2",
   "intersection_id": "intersection-1",
   "phase_id": 2,
   "time_in_phase_s": 15.5,

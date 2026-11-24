@@ -8,6 +8,7 @@ from .in_memory_state import InMemoryTrafficState
 from .schemas import (
     ControllerAck,
     IntersectionState,
+    MetricsSnapshot,
     SignalCommand,
     VehicleAdvisory,
     VehicleState,
@@ -24,7 +25,8 @@ MESSAGE_SCHEMAS = {
     "vyro/v1/intersection/state": IntersectionState,
     "vyro/v1/controller/command": SignalCommand,
     "vyro/v1/controller/ack": ControllerAck,
-    "vyro/v1/vehicle/+/advisory": VehicleAdvisory,
+    "vyro/v1/vehicle/advisory": VehicleAdvisory,
+    "vyro/v1/metrics/snapshot": MetricsSnapshot,
 }
 
 
@@ -53,21 +55,30 @@ class MQTTMessageHandler:
     def __call__(self, topic: str, payload: bytes) -> bool | str:
         if len(payload) > MAX_PAYLOAD_BYTES:
             logger.warning("Rejected oversized MQTT message for topic %s", topic)
+            if self.sqlite_logger is not None:
+                self.sqlite_logger.log_async(
+                    topic, payload, valid=False, error="oversized payload"
+                )
             return False
         if not self.rate_limiter.allow():
             logger.warning("Rejected MQTT message for topic %s due to rate limit", topic)
             return False
-        if self.sqlite_logger is not None:
-            self.sqlite_logger.log_async(topic, payload)
-
         schema = MESSAGE_SCHEMAS.get(topic)
         if schema is None:
+            if self.sqlite_logger is not None:
+                self.sqlite_logger.log_async(
+                    topic, payload, valid=False, error="unsupported topic"
+                )
             logger.warning("Rejected MQTT message for unsupported topic %s", topic)
             return False
 
         try:
             message = schema.model_validate_json(payload)
         except ValidationError as exc:
+            if self.sqlite_logger is not None:
+                self.sqlite_logger.log_async(
+                    topic, payload, valid=False, error="schema validation failed"
+                )
             logger.warning(
                 "Rejected invalid MQTT message for topic %s (%d validation errors)",
                 topic,
@@ -75,8 +86,14 @@ class MQTTMessageHandler:
             )
             return False
         if isinstance(message, VehicleState) and not validate_vehicle_state(message):
+            if self.sqlite_logger is not None:
+                self.sqlite_logger.log_async(
+                    topic, payload, valid=False, error="vehicle state rejected"
+                )
             logger.warning("Rejected off-network or impossible vehicle state")
             return False
+        if self.sqlite_logger is not None:
+            self.sqlite_logger.log_async(topic, payload, valid=True)
 
         message_data = message.model_dump(mode="json")
         if self.traffic_state is not None:

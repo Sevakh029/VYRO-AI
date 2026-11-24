@@ -47,10 +47,27 @@ class SQLiteMessageLogger:
                             topic TEXT NOT NULL,
                             payload BLOB NOT NULL,
                             received_at TEXT NOT NULL,
-                            schema_version TEXT
+                            schema_version TEXT,
+                            valid INTEGER NOT NULL DEFAULT 0,
+                            error TEXT
                         )
                         """
                     )
+                    columns = {
+                        row[1]
+                        for row in connection.execute(
+                            "PRAGMA table_info(received_messages)"
+                        ).fetchall()
+                    }
+                    if "valid" not in columns:
+                        connection.execute(
+                            "ALTER TABLE received_messages "
+                            "ADD COLUMN valid INTEGER NOT NULL DEFAULT 0"
+                        )
+                    if "error" not in columns:
+                        connection.execute(
+                            "ALTER TABLE received_messages ADD COLUMN error TEXT"
+                        )
                     connection.execute(
                         """
                         CREATE INDEX IF NOT EXISTS idx_received_messages_topic
@@ -70,7 +87,14 @@ class SQLiteMessageLogger:
                 logger.exception("Unable to initialize SQLite message logger")
                 raise
 
-    def log_message(self, topic: str, payload: bytes) -> int:
+    def log_message(
+        self,
+        topic: str,
+        payload: bytes,
+        *,
+        valid: bool = False,
+        error: str | None = None,
+    ) -> int:
         self.initialize()
         received_at = self._received_at().astimezone(UTC).isoformat()
         schema_version = self._extract_schema_version(payload)
@@ -80,10 +104,17 @@ class SQLiteMessageLogger:
                 cursor = connection.execute(
                     """
                     INSERT INTO received_messages
-                        (topic, payload, received_at, schema_version)
-                    VALUES (?, ?, ?, ?)
+                        (topic, payload, received_at, schema_version, valid, error)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (topic, sqlite3.Binary(payload), received_at, schema_version),
+                    (
+                        topic,
+                        sqlite3.Binary(payload),
+                        received_at,
+                        schema_version,
+                        int(valid),
+                        error,
+                    ),
                 )
                 if cursor.lastrowid is None:
                     raise RuntimeError("SQLite did not return an ID for the inserted message")
@@ -104,13 +135,20 @@ class SQLiteMessageLogger:
             logger.exception("Failed to persist MQTT message from topic %s", topic)
             raise
 
-    def log_async(self, topic: str, payload: bytes) -> Future[int]:
+    def log_async(
+        self,
+        topic: str,
+        payload: bytes,
+        *,
+        valid: bool = False,
+        error: str | None = None,
+    ) -> Future[int]:
         if self._closed:
             self._reopen()
 
         def persist() -> int:
             try:
-                return self.log_message(topic, payload)
+                return self.log_message(topic, payload, valid=valid, error=error)
             except sqlite3.Error as exc:
                 raise exc
 

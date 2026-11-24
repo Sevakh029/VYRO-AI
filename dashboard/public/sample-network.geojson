@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"LineString","coordinates":[[44.4991,40.1792],[44.5030,40.1815],[44.5070,40.1840]]},"properties":{"name":"Yerevan sample route"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[44.4991,40.1792]},"properties":{"kind":"signal","name":"Sample signal"}}]}

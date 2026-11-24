@@ -8,4 +8,4 @@ class MetricsSnapshot(VYROSchema):
     mean_speed_mps: float = Field(ge=0, allow_inf_nan=False)
     stopped_vehicle_count: int = Field(ge=0)
     timestamp: UTCDateTime
-    schema_version: str = Field(default="v1.0", min_length=1, max_length=32)
+    schema_version: str = Field(default="0.2", min_length=1, max_length=32)

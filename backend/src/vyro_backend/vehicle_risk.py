@@ -55,7 +55,7 @@ def risk_advisories(
                         advisory_type="risk",
                         message=f"Collision risk with {leader.vehicle_id}",
                         timestamp=follower.timestamp,
-                        schema_version="v1.1",
+                        schema_version="0.2",
                     )
                 )
                 break

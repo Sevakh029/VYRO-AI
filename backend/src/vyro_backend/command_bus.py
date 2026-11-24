@@ -35,7 +35,7 @@ class CommandBus:
             reason=reason,
             timestamp=datetime.now(UTC),
             command_id=str(uuid.uuid4()),
-            schema_version="v1.1",
+            schema_version="0.2",
         )
         with self._lock:
             self.pending[command.command_id] = command

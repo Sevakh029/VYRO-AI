@@ -41,7 +41,7 @@ def test_valid_message_reaches_multiple_websocket_clients(tmp_path, monkeypatch)
 
             expected_broadcast = {
                 **message,
-                "schema_version": "v1.0",
+                "schema_version": "0.2",
                 "vehicle_type": "unknown",
             }
             assert first.receive_json() == expected_broadcast
@@ -95,7 +95,7 @@ def test_invalid_message_is_not_broadcast_or_stored(tmp_path, monkeypatch) -> No
 
             assert websocket.receive_json() == {
                 **valid,
-                "schema_version": "v1.0",
+                "schema_version": "0.2",
                 "vehicle_type": "unknown",
             }
 

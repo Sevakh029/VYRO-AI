@@ -16,7 +16,7 @@ def vehicle(vehicle_id: str, latitude: float, speed_mps: float) -> VehicleState:
         speed_mps=speed_mps,
         heading_deg=0,
         timestamp=datetime(2026, 11, 23, tzinfo=UTC),
-        schema_version="v1.1",
+        schema_version="0.2",
     )
 
 

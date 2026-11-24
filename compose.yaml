@@ -1,19 +1,23 @@
 services:
   mosquitto:
-    image: eclipse-mosquitto:2
+    image: eclipse-mosquitto:2.0
     container_name: vyro-mosquitto
     ports:
-      - "1883:1883"
+      - "127.0.0.1:1883:1883"
     volumes:
       - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/entrypoint.sh:/mosquitto/config/entrypoint.sh:ro
+      - mosquitto-data:/mosquitto/data
       - mosquitto-auth:/mosquitto/config/auth
-    command:
-      - sh
-      - -c
-      - "mosquitto_passwd -b -c /mosquitto/config/auth/passwords \"$${MQTT_USERNAME:-vyro-backend}\" \"$${MQTT_PASSWORD:-vyro-dev-password}\" && mosquitto -c /mosquitto/config/mosquitto.conf"
+    entrypoint: ["/mosquitto/config/entrypoint.sh"]
     environment:
-      MQTT_USERNAME: ${MQTT_USERNAME:-vyro-backend}
-      MQTT_PASSWORD: ${MQTT_PASSWORD:-vyro-dev-password}
+      MQTT_USERNAME: ${MQTT_USERNAME:?Set MQTT_USERNAME in .env}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:?Set MQTT_PASSWORD in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -p 1883 -t '$$SYS/broker/uptime' -C 1 -u \"$${MQTT_USERNAME}\" -P \"$${MQTT_PASSWORD}\" >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   backend:
@@ -22,17 +26,18 @@ services:
       dockerfile: backend/Dockerfile
     container_name: vyro-backend
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       MQTT_HOST: mosquitto
       MQTT_PORT: "1883"
-      MQTT_USERNAME: ${MQTT_USERNAME:-vyro-backend}
-      MQTT_PASSWORD: ${MQTT_PASSWORD:-vyro-dev-password}
+      MQTT_USERNAME: ${MQTT_USERNAME:?Set MQTT_USERNAME in .env}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:?Set MQTT_PASSWORD in .env}
       VYRO_SQLITE_DB_PATH: /app/data/vyro_messages.db
     volumes:
       - backend-data:/app/data
     depends_on:
-      - mosquitto
+      mosquitto:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
