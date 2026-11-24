@@ -1,4 +1,4 @@
-function NetworkActivity({ online, offline, alertCount, onSimulateAlert }) {
+function NetworkActivity({ online, offline, alertCount, onSimulateAlert, intersections }) {
   const rows = [
     { id: 'online', label: 'Online vehicles', value: online },
     { id: 'offline', label: 'Offline vehicles', value: offline },
@@ -9,7 +9,7 @@ function NetworkActivity({ online, offline, alertCount, onSimulateAlert }) {
     <section className="card activity-card" aria-labelledby="activity-heading">
       <div className="panel-heading">
         <h2 id="activity-heading">Network activity</h2>
-        <p>Sample fleet status. Alerts can be simulated locally.</p>
+        <p>Live fleet status and observed signal intersections.</p>
       </div>
       <ul className="activity-list">
         {rows.map((row) => (
@@ -19,6 +19,16 @@ function NetworkActivity({ online, offline, alertCount, onSimulateAlert }) {
           </li>
         ))}
       </ul>
+      {intersections.length > 0 && (
+        <ul className="activity-list">
+          {intersections.map((intersection) => (
+            <li key={intersection.intersection_id} className="activity-row">
+              <span>{intersection.intersection_id}</span>
+              <strong>Phase {intersection.phase_id}</strong>
+            </li>
+          ))}
+        </ul>
+      )}
       <button type="button" className="alert-button" onClick={onSimulateAlert}>
         Simulate new alert
       </button>

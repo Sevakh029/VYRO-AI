@@ -49,3 +49,17 @@ python simulation\generate_fixed_time_plan.py `
 
 Load the generated file with the source network using SUMO's `--additional-files`
 option. The controller package itself does not import SUMO or `sumolib`.
+
+## TraCI to MQTT bridge
+
+Publish live vehicle positions from a SUMO network and route file:
+
+```powershell
+$env:SUMO_HOME="C:\path\to\sumo"
+python simulation\sumo_mqtt_bridge.py `
+  simulation\osm\yerevan\barekamutyun_kievyan.net.xml `
+  path\to\routes.rou.xml `
+  --west 44.488 --south 40.202 --east 44.496 --north 40.210
+```
+
+The bridge publishes `VehicleState` JSON at 1 Hz to `vyro/v1/vehicle/state`.

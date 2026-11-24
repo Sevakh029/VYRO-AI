@@ -1,49 +1,71 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Header from './components/Header'
 import KpiPanel from './components/KpiPanel'
 import MapArea from './components/MapArea'
 import NetworkActivity from './components/NetworkActivity'
 import './App.css'
 
-const ONLINE_VEHICLES = 121
-const OFFLINE_VEHICLES = 7
-const INITIAL_ALERTS = 4
-
-const VEHICLES = [
-  { id: 'VY-1042', x: 22, y: 28, speed: '51 km/h', state: 'moving' },
-  { id: 'VY-1188', x: 48, y: 28, speed: '44 km/h', state: 'moving' },
-  { id: 'VY-1216', x: 64, y: 40, speed: '0 km/h', state: 'idle' },
-  { id: 'VY-1304', x: 32, y: 58, speed: '39 km/h', state: 'moving' },
-  { id: 'VY-1411', x: 54, y: 66, speed: '47 km/h', state: 'moving' },
-  { id: 'VY-1509', x: 22, y: 66, speed: '0 km/h', state: 'idle' },
-]
-
-const SYSTEM_STATUS = {
-  label: 'System operational',
-  tone: 'ok',
-}
+const INITIAL_ALERTS = 0
 
 function App() {
   const [alertCount, setAlertCount] = useState(INITIAL_ALERTS)
+  const [vehicles, setVehicles] = useState({})
+  const [connectionStatus, setConnectionStatus] = useState('Connecting')
+  const [intersections, setIntersections] = useState({})
+
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const backendHost = import.meta.env.VITE_BACKEND_WS_HOST || '127.0.0.1:8000'
+    const socket = new WebSocket(`${protocol}//${backendHost}/ws`)
+
+    socket.onopen = () => setConnectionStatus('Live')
+    socket.onclose = () => setConnectionStatus('Disconnected')
+    socket.onerror = () => setConnectionStatus('Connection error')
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data)
+      if (message.vehicle_id) {
+        setVehicles((current) => ({
+          ...current,
+          [message.vehicle_id]: message,
+        }))
+      }
+      if (message.intersection_id) {
+        setIntersections((current) => ({
+          ...current,
+          [message.intersection_id]: message,
+        }))
+      }
+      if (message.advisory_type || message.reason) {
+        setAlertCount((current) => current + 1)
+      }
+    }
+
+    return () => socket.close()
+  }, [])
+
+  const vehicleList = Object.values(vehicles)
+  const averageSpeed = vehicleList.length
+    ? vehicleList.reduce((sum, vehicle) => sum + vehicle.speed_mps, 0) / vehicleList.length
+    : 0
 
   const metrics = [
     {
       id: 'vehicles',
       label: 'Connected vehicles',
-      value: String(ONLINE_VEHICLES + OFFLINE_VEHICLES),
-      detail: 'Registered on the sample network',
+      value: String(vehicleList.length),
+      detail: 'Received through the live MQTT bridge',
     },
     {
       id: 'alerts',
       label: 'Active alerts',
       value: String(alertCount),
-      detail: 'Includes locally simulated events',
+      detail: 'Received advisories and controller alerts',
     },
     {
       id: 'speed',
       label: 'Average vehicle speed',
-      value: '46 km/h',
-      detail: 'Sample fleet average',
+      value: `${(averageSpeed * 3.6).toFixed(1)} km/h`,
+      detail: 'Live fleet average',
     },
   ]
 
@@ -53,16 +75,17 @@ function App() {
 
   return (
     <div className="dashboard">
-      <Header status={SYSTEM_STATUS} />
+      <Header status={{ label: connectionStatus, tone: connectionStatus === 'Live' ? 'ok' : 'alert' }} />
       <main className="dashboard-main">
         <KpiPanel metrics={metrics} />
         <div className="dashboard-grid">
-          <MapArea vehicles={VEHICLES} />
+          <MapArea vehicles={vehicleList} />
           <NetworkActivity
-            online={ONLINE_VEHICLES}
-            offline={OFFLINE_VEHICLES}
+            online={vehicleList.length}
+            offline={0}
             alertCount={alertCount}
             onSimulateAlert={handleSimulateAlert}
+            intersections={Object.values(intersections)}
           />
         </div>
       </main>
