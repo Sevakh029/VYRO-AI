@@ -1,0 +1,45 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: vyro-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-auth:/mosquitto/config/auth
+    command:
+      - sh
+      - -c
+      - "mosquitto_passwd -b -c /mosquitto/config/auth/passwords \"$${MQTT_USERNAME:-vyro-backend}\" \"$${MQTT_PASSWORD:-vyro-dev-password}\" && mosquitto -c /mosquitto/config/mosquitto.conf"
+    environment:
+      MQTT_USERNAME: ${MQTT_USERNAME:-vyro-backend}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-vyro-dev-password}
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: vyro-backend
+    ports:
+      - "8000:8000"
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      MQTT_USERNAME: ${MQTT_USERNAME:-vyro-backend}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-vyro-dev-password}
+      VYRO_SQLITE_DB_PATH: /app/data/vyro_messages.db
+    volumes:
+      - backend-data:/app/data
+    depends_on:
+      - mosquitto
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  backend-data:
+  mosquitto-auth:

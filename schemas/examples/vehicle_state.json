@@ -1,0 +1,9 @@
+{
+  "schema_version": "v1.0",
+  "vehicle_id": "vehicle-1",
+  "latitude": 40.1811,
+  "longitude": 44.5136,
+  "speed_mps": 12.5,
+  "heading_deg": 90.0,
+  "timestamp": "2026-11-20T10:00:00Z"
+}

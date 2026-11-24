@@ -1,0 +1,8 @@
+{
+  "schema_version": "v1.1",
+  "command_id": "5f8a0c6e-0b88-4a3e-8e10-6cf4e9a4c001",
+  "intersection_id": "intersection-1",
+  "phase_id": 1,
+  "reason": "queue_pressure",
+  "timestamp": "2026-11-20T10:00:00Z"
+}
