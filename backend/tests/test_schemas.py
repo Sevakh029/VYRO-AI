@@ -203,3 +203,24 @@ def test_schema_version_defaults_to_0_2_and_accepts_explicit_value() -> None:
 
     assert defaulted.schema_version == "0.2"
     assert explicit.schema_version == "0.2"
+
+
+@pytest.mark.parametrize(
+    ("model", "example_name"),
+    [
+        (VehicleState, "vehicle_state.json"),
+        (IntersectionState, "intersection_state.json"),
+        (SignalCommand, "signal_command.json"),
+        (VehicleAdvisory, "vehicle_advisory.json"),
+        (MetricsSnapshot, "metrics_snapshot.json"),
+        (ControllerAck, "controller_ack.json"),
+        (PreemptionRequest, "preemption_request.json"),
+    ],
+)
+def test_schema_models_reject_naive_timestamps(model: type, example_name: str) -> None:
+    example_path = Path(__file__).parents[2] / "schemas" / "examples" / example_name
+    payload = json.loads(example_path.read_text(encoding="utf-8"))
+    payload["timestamp"] = "2026-11-24T10:00:00"
+
+    with pytest.raises(ValidationError, match="timezone-aware UTC"):
+        model.model_validate(payload)

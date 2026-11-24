@@ -9,6 +9,7 @@ from .schemas import (
     ControllerAck,
     IntersectionState,
     MetricsSnapshot,
+    PreemptionRequest,
     SignalCommand,
     VehicleAdvisory,
     VehicleState,
@@ -27,6 +28,7 @@ MESSAGE_SCHEMAS = {
     "vyro/v1/controller/ack": ControllerAck,
     "vyro/v1/vehicle/advisory": VehicleAdvisory,
     "vyro/v1/metrics/snapshot": MetricsSnapshot,
+    "vyro/v1/preemption/request": PreemptionRequest,
 }
 
 
@@ -62,6 +64,10 @@ class MQTTMessageHandler:
             return False
         if not self.rate_limiter.allow():
             logger.warning("Rejected MQTT message for topic %s due to rate limit", topic)
+            if self.sqlite_logger is not None:
+                self.sqlite_logger.log_async(
+                    topic, payload, valid=False, error="rate limit exceeded"
+                )
             return False
         schema = MESSAGE_SCHEMAS.get(topic)
         if schema is None:
@@ -106,11 +112,11 @@ class MQTTMessageHandler:
         with self._loop_lock:
             loop = self._loop
             if loop is not None and loop.is_running():
-                loop.call_soon_threadsafe(self._schedule_broadcast, message_data)
+                loop.call_soon_threadsafe(self._schedule_broadcast, topic, message_data)
         entity_id = getattr(message, "vehicle_id", None) or getattr(
             message, "intersection_id", None
         )
         return entity_id or True
 
-    def _schedule_broadcast(self, message: dict[str, object]) -> None:
-        asyncio.create_task(self.websocket_manager.broadcast(message))
+    def _schedule_broadcast(self, topic: str, message: dict[str, object]) -> None:
+        asyncio.create_task(self.websocket_manager.broadcast({**message, "topic": topic}))

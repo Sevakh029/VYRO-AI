@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import sumolib
 
-from simulation.generate_fixed_time_plan import (
+from sim.generate_fixed_time_plan import (
     PhaseDemandSettings,
     build_fixed_time_additional,
     load_phase_demands,

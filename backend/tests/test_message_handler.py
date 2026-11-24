@@ -6,7 +6,15 @@ import pytest
 from fastapi import WebSocketDisconnect
 from vyro_backend.message_handler import MESSAGE_SCHEMAS, MQTTMessageHandler
 from vyro_backend.mqtt_subscriber import MQTTSubscriber
-from vyro_backend.schemas import IntersectionState, SignalCommand, VehicleState
+from vyro_backend.schemas import (
+    ControllerAck,
+    IntersectionState,
+    MetricsSnapshot,
+    PreemptionRequest,
+    SignalCommand,
+    VehicleAdvisory,
+    VehicleState,
+)
 from vyro_backend.websocket_manager import WebSocketManager
 
 UTC_TIMESTAMP = "2026-11-21T10:00:00Z"
@@ -45,6 +53,51 @@ VALID_MESSAGES = [
         },
         SignalCommand,
         "intersection-1",
+    ),
+    (
+        "vyro/v1/controller/ack",
+        {
+            "command_id": "command-1",
+            "intersection_id": "intersection-1",
+            "applied": True,
+            "reason": "applied",
+            "timestamp": UTC_TIMESTAMP,
+        },
+        ControllerAck,
+        "intersection-1",
+    ),
+    (
+        "vyro/v1/vehicle/advisory",
+        {
+            "vehicle_id": "vehicle-1",
+            "advisory_type": "speed",
+            "message": "slow down",
+            "timestamp": UTC_TIMESTAMP,
+        },
+        VehicleAdvisory,
+        "vehicle-1",
+    ),
+    (
+        "vyro/v1/metrics/snapshot",
+        {
+            "vehicle_count": 2,
+            "mean_speed_mps": 5,
+            "stopped_vehicle_count": 0,
+            "timestamp": UTC_TIMESTAMP,
+        },
+        MetricsSnapshot,
+        True,
+    ),
+    (
+        "vyro/v1/preemption/request",
+        {
+            "intersection_id": "intersection-1",
+            "vehicle_id": "ambulance-1",
+            "lead_time_s": 8,
+            "timestamp": UTC_TIMESTAMP,
+        },
+        PreemptionRequest,
+        "ambulance-1",
     ),
 ]
 
@@ -97,3 +150,7 @@ def test_schema_registry_uses_existing_schema_types() -> None:
     assert MESSAGE_SCHEMAS["vyro/v1/vehicle/state"] is VehicleState
     assert MESSAGE_SCHEMAS["vyro/v1/intersection/state"] is IntersectionState
     assert MESSAGE_SCHEMAS["vyro/v1/controller/command"] is SignalCommand
+    assert MESSAGE_SCHEMAS["vyro/v1/controller/ack"] is ControllerAck
+    assert MESSAGE_SCHEMAS["vyro/v1/vehicle/advisory"] is VehicleAdvisory
+    assert MESSAGE_SCHEMAS["vyro/v1/metrics/snapshot"] is MetricsSnapshot
+    assert MESSAGE_SCHEMAS["vyro/v1/preemption/request"] is PreemptionRequest

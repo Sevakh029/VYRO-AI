@@ -28,6 +28,28 @@ def export_geojson(network_file: Path, output_file: Path) -> dict[str, Any]:
                 "properties": {"edge_id": edge.getID()},
             }
         )
+    for traffic_light in network.getTrafficLights():
+        node = network.getNode(traffic_light.getID())
+        if node is None:
+            raise ValueError(
+                f"Traffic light {traffic_light.getID()} has no corresponding network node"
+            )
+        x, y = node.getCoord()
+        longitude, latitude = network.convertXY2LonLat(x, y)
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [longitude, latitude],
+                },
+                "properties": {
+                    "kind": "signal",
+                    "name": f"Traffic signal {traffic_light.getID()}",
+                    "tls_id": traffic_light.getID(),
+                },
+            }
+        )
     collection = {"type": "FeatureCollection", "features": features}
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(json.dumps(collection, indent=2), encoding="utf-8")
@@ -40,3 +62,7 @@ def main() -> None:
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
     export_geojson(args.network, args.output)
+
+
+if __name__ == "__main__":
+    main()

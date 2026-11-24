@@ -2,6 +2,7 @@ import json
 import sqlite3
 
 import paho.mqtt.client as mqtt
+import pytest
 from fastapi.testclient import TestClient
 from vyro_backend.app import app, mqtt_message_handler, mqtt_subscriber
 
@@ -43,6 +44,7 @@ def test_valid_message_reaches_multiple_websocket_clients(tmp_path, monkeypatch)
                 **message,
                 "schema_version": "0.2",
                 "vehicle_type": "unknown",
+                "topic": VEHICLE_TOPIC,
             }
             assert first.receive_json() == expected_broadcast
             assert second.receive_json() == expected_broadcast
@@ -97,7 +99,56 @@ def test_invalid_message_is_not_broadcast_or_stored(tmp_path, monkeypatch) -> No
                 **valid,
                 "schema_version": "0.2",
                 "vehicle_type": "unknown",
+                "topic": VEHICLE_TOPIC,
             }
 
     assert mqtt_subscriber.get_latest(VEHICLE_TOPIC) == json.dumps(valid).encode()
     assert "ws-vehicle-invalid" not in mqtt_subscriber.store.get_entities(VEHICLE_TOPIC)
+
+
+@pytest.mark.parametrize(
+    ("topic", "message"),
+    [
+        (
+            "vyro/v1/controller/ack",
+            {
+                "command_id": "command-1",
+                "intersection_id": "intersection-1",
+                "applied": True,
+                "reason": "applied",
+                "timestamp": "2026-11-21T10:00:00Z",
+            },
+        ),
+        (
+            "vyro/v1/metrics/snapshot",
+            {
+                "vehicle_count": 4,
+                "mean_speed_mps": 6.5,
+                "stopped_vehicle_count": 1,
+                "timestamp": "2026-11-21T10:00:00Z",
+            },
+        ),
+    ],
+)
+def test_ack_and_metrics_topics_are_broadcast_with_topic(
+    topic: str, message: dict, tmp_path, monkeypatch
+) -> None:
+    logger = mqtt_message_handler.sqlite_logger
+    assert logger is not None
+    monkeypatch.setattr(logger, "database_path", tmp_path / "topic.db")
+    monkeypatch.setattr(logger, "_initialized", False)
+
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as websocket:
+            mqtt_subscriber._on_mqtt_message(
+                mqtt_subscriber.client,
+                None,
+                make_message(topic, json.dumps(message).encode()),
+            )
+            logger.flush(timeout=5)
+
+            assert websocket.receive_json() == {
+                **message,
+                "schema_version": "0.2",
+                "topic": topic,
+            }

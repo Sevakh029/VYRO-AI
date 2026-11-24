@@ -20,24 +20,22 @@ def main() -> None:
         raise RuntimeError("SUMO_HOME is not set.")
     sumo_home = Path(sumo_home_value)
     traci = _load_traci(sumo_home)
-    sumo_gui = sumo_home / "bin" / "sumo-gui.exe"
+    sumo_binary = sumo_home / "bin" / ("sumo.exe" if os.name == "nt" else "sumo")
     example = sumo_home / "tools" / "game" / "cross"
     network = example / "cross.net.xml"
     routes = example / "cross.rou.xml"
-    if not sumo_gui.is_file() or not network.is_file() or not routes.is_file():
-        raise FileNotFoundError(f"SUMO GUI or bundled example files not found under {sumo_home}")
+    if not sumo_binary.is_file() or not network.is_file() or not routes.is_file():
+        raise FileNotFoundError(f"SUMO binary or bundled example files not found under {sumo_home}")
 
     traci.start(
         [
-            str(sumo_gui),
+            str(sumo_binary),
             "--net-file",
             str(network),
             "--route-files",
             str(routes),
             "--step-length",
             "1",
-            "--delay",
-            "0",
             "--start",
             "--quit-on-end",
         ]

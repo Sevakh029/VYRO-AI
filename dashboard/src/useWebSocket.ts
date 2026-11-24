@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  messageKey,
+  parseTopicMessage,
+  pruneStaleVehicleStates,
+  type TopicMessageStore,
+} from "./types";
 
 export function useWebSocket(url: string) {
   const socketRef = useRef<WebSocket | null>(null);
   const [status, setStatus] = useState("Connecting");
-  const [messages, setMessages] = useState<Record<string, unknown>>({});
+  const [messages, setMessages] = useState<TopicMessageStore>({});
 
   useEffect(() => {
     let stopped = false;
     let attempt = 0;
     let timer: number | undefined;
+    const pruneTimer = window.setInterval(() => {
+      setMessages((current) => pruneStaleVehicleStates(current));
+    }, 1000);
 
     const connect = () => {
       if (stopped) return;
@@ -20,9 +29,20 @@ export function useWebSocket(url: string) {
       };
       socket.onmessage = (event) => {
         try {
-          const message = JSON.parse(event.data) as Record<string, unknown>;
-          const topic = typeof message.topic === "string" ? message.topic : "broadcast";
-          setMessages((current) => ({ ...current, [topic]: message }));
+          const value: unknown = JSON.parse(event.data);
+          const message = parseTopicMessage(value);
+          if (!message) {
+            setStatus("Invalid message");
+            return;
+          }
+          const key = messageKey(message);
+          setMessages((current) => ({
+            ...current,
+            [message.topic]: {
+              ...current[message.topic],
+              [key]: message,
+            },
+          }));
         } catch {
           setStatus("Invalid message");
         }
@@ -40,6 +60,7 @@ export function useWebSocket(url: string) {
     return () => {
       stopped = true;
       if (timer) window.clearTimeout(timer);
+      window.clearInterval(pruneTimer);
       socketRef.current?.close();
     };
   }, [url]);

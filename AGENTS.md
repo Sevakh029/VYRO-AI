@@ -12,7 +12,6 @@
 - `agents/` owns agent-specific operational configuration and .gitkeep placeholders.
 - `experiments/` owns experiment metadata and source CSV references; result output is gitignored.
 - `dashboard/` is P4-owned React/TypeScript dashboard code.
-- `simulation/` is legacy P1 code and is being migrated to `sim/`; new P1 work belongs in `sim/`.
 - P1 owns SUMO networks and TraCI integration.
 - P2 owns schemas of estimator/controller behavior and pure control algorithms.
 - P4 owns the React dashboard and network map.

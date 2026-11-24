@@ -1,6 +1,6 @@
 services:
   mosquitto:
-    image: eclipse-mosquitto:2.0
+    image: eclipse-mosquitto:2.0.22
     container_name: vyro-mosquitto
     ports:
       - "127.0.0.1:1883:1883"
@@ -8,13 +8,12 @@ services:
       - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./mosquitto/entrypoint.sh:/mosquitto/config/entrypoint.sh:ro
       - mosquitto-data:/mosquitto/data
-      - mosquitto-auth:/mosquitto/config/auth
-    entrypoint: ["/mosquitto/config/entrypoint.sh"]
+    entrypoint: ["/bin/sh", "/mosquitto/config/entrypoint.sh"]
     environment:
       MQTT_USERNAME: ${MQTT_USERNAME:?Set MQTT_USERNAME in .env}
       MQTT_PASSWORD: ${MQTT_PASSWORD:?Set MQTT_PASSWORD in .env}
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -p 1883 -t '$$SYS/broker/uptime' -C 1 -u \"$${MQTT_USERNAME}\" -P \"$${MQTT_PASSWORD}\" >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 1883"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -39,7 +38,13 @@ services:
       mosquitto:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; from websockets.sync.client import connect; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).close(); ws = connect('ws://127.0.0.1:8000/ws', open_timeout=2); ws.close()",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,4 +52,4 @@ services:
 
 volumes:
   backend-data:
-  mosquitto-auth:
+  mosquitto-data:

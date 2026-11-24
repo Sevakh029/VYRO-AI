@@ -21,7 +21,7 @@ python -m pip install -e ".[dev]"
   `SignalCommand`. See [state_spec.md](docs/state_spec.md).
 - **Webster baseline:** `vyro_controller.webster` calculates bounded cycle lengths and
   minimum-green-constrained splits. The SUMO file adapter is in
-  `simulation/generate_fixed_time_plan.py`, outside the pure controller package.
+  `sim/generate_fixed_time_plan.py`, outside the pure controller package.
 
 ## Tests
 

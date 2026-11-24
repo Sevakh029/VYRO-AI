@@ -2,7 +2,12 @@
 
 Audit date: 2026-11-24
 
-## Controller
+## Initial audit snapshot
+
+The findings in this section record the repository before the implementation
+work below. They are historical, not the current status.
+
+### Controller
 
 | Item | Finding |
 |---|---|
@@ -13,7 +18,7 @@ Audit date: 2026-11-24
 | controller/docs/state_spec.md | PRESENT. |
 | Fixed-time plan generator | PRESENT as simulation/generate_fixed_time_plan.py, but the repository plan calls for sim/ and net phase data is outside the controller. |
 
-## Backend
+### Backend
 
 | Item | Finding |
 |---|---|
@@ -30,7 +35,7 @@ Audit date: 2026-11-24
 | mqtt_subscriber | PRESENT. |
 | backend/Dockerfile | PRESENT. |
 
-## Broker and infrastructure
+### Broker and infrastructure
 
 | Item | Finding |
 |---|---|
@@ -40,7 +45,7 @@ Audit date: 2026-11-24
 | Mosquitto healthcheck | MISSING. |
 | .github/workflows | PRESENT; only a Python 3.11 test job exists. |
 
-## Simulation
+### Simulation
 
 | Item | Finding |
 |---|---|
@@ -50,7 +55,7 @@ Audit date: 2026-11-24
 | Yerevan net file | MISSING as yerevan_v0.net.xml. |
 | Candidate OSM exports | PRESENT under simulation/osm/yerevan/ for three candidate areas. |
 
-## Dashboard
+### Dashboard
 
 | Item | Finding |
 |---|---|
@@ -59,7 +64,7 @@ Audit date: 2026-11-24
 | Yerevan map | PRESENT; only react/leaflet packages are not wired into source as a complete typed dashboard. |
 | WebSocket typed reconnect hook | MISSING. |
 
-## Schemas and records
+### Schemas and records
 
 | Item | Finding |
 |---|---|
@@ -67,12 +72,53 @@ Audit date: 2026-11-24
 | docs/ architecture records | PRESENT for prompt-log, security, and topics. |
 | docs/audit.md | CREATED by this audit. |
 
-## Other planned folders
+### Other planned folders
 
 | Item | Finding |
 |---|---|
 | agents/ | MISSING |
 | experiments/ | MISSING |
+
+## Recheck correction (2026-11-24)
+
+The findings above are the initial baseline, not current status. SUMO 1.28.0 is
+installed; all three Yerevan candidate networks exist, and the bundled headless
+TraCI example completed 100 steps. Simulation sources and tests have moved to
+`sim/`. The dashboard lockfile is regenerated, and clean install, production
+build, and frontend tests pass.
+
+Docker Desktop is installed and its Linux engine now runs. The backend image
+builds, and Compose starts both services healthy. A container-level check
+confirmed MQTT credentials are required, valid vehicle messages reach backend
+state and SQLite, and invalid broker credentials are rejected. That runtime
+check exposed a root-owned Mosquitto password file that the broker could not
+read after dropping privileges; the entrypoint now assigns it to the
+`mosquitto` user.
+
+The selected OSM area has been reconverted as `sim/net/yerevan_v0.net.xml`;
+SUMO reports 9 signal controllers. `netcheck.py` reports 399/516 edges in the
+largest connected component (77.3%) and 90.3% when ignoring lane connections.
+The disconnected fringe roads and clipped turn restrictions remain known OSM
+limitations; no speculative lane connections or signal timings were added.
+The network's synthetic smoke-demand route set was validated and all 60
+generated vehicles completed a SUMO run. This verifies plumbing only, not a
+traffic study.
+
+The dashboard now loads road and signal geometry exported from that network,
+and the TraCI bridge waits for MQTT connection before advancing SUMO. The live
+SUMO-to-MQTT-to-backend-to-dashboard run exposed a missing optional Uvicorn
+WebSocket dependency; it is now an explicit backend dependency, and the Compose
+health check verifies both `/health` and a real `/ws` handshake. All 60
+synthetic vehicles reached backend state and SQLite. The dashboard displayed
+live vehicles and speed, then cleared stale states after the 15-second expiry.
+
+The Python suite (142 tests), Ruff, dashboard build/tests, Compose validation,
+Docker image build, WebSocket health check, and broker/backend integration
+checks pass. No measured Yerevan demand or calibrated experiment was run.
+Synthetic random trips are used only for the reproducible software smoke test.
+
+| Repository area | Current status |
+|---|---|
 | mosquitto/ | PRESENT |
 | docs/ | PRESENT |
 | schemas/ | PRESENT |

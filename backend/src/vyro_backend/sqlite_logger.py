@@ -96,7 +96,10 @@ class SQLiteMessageLogger:
         error: str | None = None,
     ) -> int:
         self.initialize()
-        received_at = self._received_at().astimezone(UTC).isoformat()
+        timestamp = self._received_at()
+        if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+            raise ValueError("received_at must be timezone-aware")
+        received_at = timestamp.astimezone(UTC).isoformat()
         schema_version = self._extract_schema_version(payload)
         try:
             with sqlite3.connect(self.database_path) as connection:

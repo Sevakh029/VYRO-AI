@@ -6,7 +6,8 @@ The Mosquitto listener is password protected. Clients authenticate with
 `MQTT_USERNAME` and `MQTT_PASSWORD`; anonymous access is disabled.
 
 The Docker Compose development setup generates its configured credential file
-inside the broker volume. Never commit real credentials or password files.
+inside the broker volume and assigns it to the Mosquitto runtime user. Never
+commit real credentials or password files.
 
 ## Validation
 

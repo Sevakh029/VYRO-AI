@@ -183,15 +183,78 @@ def test_message_handler_logs_before_validation_and_preserves_messages(tmp_path)
 
     with sqlite3.connect(database) as connection:
         rows = connection.execute(
-            "SELECT topic, payload FROM received_messages ORDER BY id"
+            "SELECT topic, payload, valid, error FROM received_messages ORDER BY id"
         ).fetchall()
     logger.close()
 
     assert len(rows) == 3
     assert rows[0][0] == "vyro/v1/vehicle/state"
     assert bytes(rows[0][1]) == valid
+    assert rows[0][2:] == (1, None)
     assert bytes(rows[1][1]) == b"{malformed"
+    assert rows[1][2:] == (0, "schema validation failed")
     assert bytes(rows[2][1]) == b"unknown payload"
+    assert rows[2][2:] == (0, "unsupported topic")
+
+
+def test_logger_rejects_naive_received_at(tmp_path) -> None:
+    logger = SQLiteMessageLogger(
+        tmp_path / "naive.db",
+        received_at=lambda: datetime(2026, 11, 22, 16, 30),
+    )
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        logger.log_message("vyro/v1/vehicle/state", b"payload")
+
+    logger.close()
+
+
+def test_logger_migrates_preexisting_message_table(tmp_path) -> None:
+    database = tmp_path / "previous-schema.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            CREATE TABLE received_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic TEXT NOT NULL,
+                payload BLOB NOT NULL,
+                received_at TEXT NOT NULL,
+                schema_version TEXT
+            )
+            """
+        )
+
+    logger = SQLiteMessageLogger(database)
+    logger.log_message("vyro/v1/vehicle/state", b"payload", valid=True)
+    logger.close()
+
+    with sqlite3.connect(database) as connection:
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(received_messages)")
+        }
+        row = connection.execute(
+            "SELECT valid, error FROM received_messages"
+        ).fetchone()
+
+    assert {"valid", "error"} <= columns
+    assert row == (1, None)
+
+
+def test_rate_limited_message_is_logged_as_invalid(tmp_path, monkeypatch) -> None:
+    logger = SQLiteMessageLogger(tmp_path / "rate-limited.db")
+    handler = MQTTMessageHandler(WebSocketManager(), logger)
+    monkeypatch.setattr(handler.rate_limiter, "allow", lambda: False)
+
+    assert handler("vyro/v1/vehicle/state", b"payload") is False
+    logger.flush(timeout=5)
+
+    with sqlite3.connect(tmp_path / "rate-limited.db") as connection:
+        row = connection.execute(
+            "SELECT valid, error FROM received_messages"
+        ).fetchone()
+    logger.close()
+
+    assert row == (0, "rate limit exceeded")
 
 
 def test_database_error_is_reported_and_raised(tmp_path, monkeypatch, caplog) -> None:

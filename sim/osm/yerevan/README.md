@@ -17,5 +17,9 @@ traffic-volume measurements. `netconvert` completed for all three maps, but
 reported some incomplete turn restrictions and transit stops near extract
 boundaries; review those before using the networks for calibrated experiments.
 
+The generated SUMO network extents differ from the input bounding boxes. See
+`sim/area_report.md` for current projected network dimensions and the
+reproducible `sim/rank_nets.py` screening.
+
 Data attribution: © OpenStreetMap contributors, licensed under the
 [Open Database License (ODbL)](https://www.openstreetmap.org/copyright).

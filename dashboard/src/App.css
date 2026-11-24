@@ -125,6 +125,12 @@
   border: 1px solid #223140;
 }
 
+.map .leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-map);
+}
+
 .map-surface,
 .markers {
   position: absolute;
