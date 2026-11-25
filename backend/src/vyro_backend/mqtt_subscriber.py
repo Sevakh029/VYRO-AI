@@ -52,6 +52,7 @@ class MQTTSubscriber:
         self.topic = topic
         self.store = LatestMessageStore()
         self._on_message = on_message
+        self.connected = False
         self.client = mqtt.Client(CallbackAPIVersion.VERSION2)
         if username is not None:
             self.client.username_pw_set(username, password)
@@ -70,8 +71,10 @@ class MQTTSubscriber:
     ) -> None:
         del userdata, flags, properties
         if reason_code.is_failure:
+            self.connected = False
             logger.error("MQTT connection failed: %s", reason_code)
             return
+        self.connected = True
         result, _ = client.subscribe(self.topic, qos=1)
         if result != mqtt.MQTT_ERR_SUCCESS:
             logger.error("MQTT subscription failed for %s", self.topic)
@@ -85,6 +88,7 @@ class MQTTSubscriber:
         properties: Properties | None,
     ) -> None:
         del client, userdata, disconnect_flags, properties
+        self.connected = False
         if reason_code.is_failure:
             logger.warning("MQTT disconnected unexpectedly: %s; reconnecting", reason_code)
         else:

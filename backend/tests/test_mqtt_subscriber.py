@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import paho.mqtt.client as mqtt
 from vyro_backend.mqtt_subscriber import LatestMessageStore, MQTTSubscriber
 
@@ -54,3 +56,24 @@ def test_entity_messages_are_retained_independently_per_topic() -> None:
         "vehicle-1": b"vehicle-1",
         "vehicle-2": b"vehicle-2",
     }
+
+
+def test_connection_state_tracks_connect_and_disconnect() -> None:
+    subscriber = MQTTSubscriber()
+    subscriber._on_connect(
+        subscriber.client,
+        None,
+        SimpleNamespace(),
+        SimpleNamespace(is_failure=False),
+        None,
+    )
+    assert subscriber.connected is True
+
+    subscriber._on_disconnect(
+        subscriber.client,
+        None,
+        SimpleNamespace(),
+        SimpleNamespace(is_failure=True),
+        None,
+    )
+    assert subscriber.connected is False

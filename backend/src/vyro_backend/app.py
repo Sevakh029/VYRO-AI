@@ -63,7 +63,10 @@ class ScenarioRequest(BaseModel):
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "mqtt_connected": str(mqtt_subscriber.connected).lower(),
+    }
 
 
 @app.get("/state")

@@ -13,7 +13,11 @@ services:
       MQTT_USERNAME: ${MQTT_USERNAME:?Set MQTT_USERNAME in .env}
       MQTT_PASSWORD: ${MQTT_PASSWORD:?Set MQTT_PASSWORD in .env}
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 1883"]
+      test:
+        [
+          "CMD-SHELL",
+          "mosquitto_pub -h 127.0.0.1 -p 1883 -u \"$MQTT_USERNAME\" -P \"$MQTT_PASSWORD\" -t vyro/v1/healthcheck -m ok -q 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,7 +47,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; from websockets.sync.client import connect; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).close(); ws = connect('ws://127.0.0.1:8000/ws', open_timeout=2); ws.close()",
+          "import json, urllib.request; from websockets.sync.client import connect; health=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)); assert health.get('mqtt_connected') == 'true'; ws = connect('ws://127.0.0.1:8000/ws', open_timeout=2); ws.close()",
         ]
       interval: 10s
       timeout: 5s
