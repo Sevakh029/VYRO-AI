@@ -71,6 +71,17 @@ def test_installed_network_projection_maps_candidate_to_yerevan() -> None:
     assert 40.19 <= latitude <= 40.22
 
 
+def test_installed_network_projection_converts_sumo_local_position_with_offset() -> None:
+    network_file = Path(__file__).parents[1] / "net" / "yerevan_v0.net.xml"
+    network = load_network(network_file)
+    projection = NetworkProjection(network.convertXY2LonLat)
+
+    latitude, longitude = projection.position_to_latlon(1013.74, 1353.343)
+
+    assert latitude == pytest.approx(40.2075297, abs=1e-6)
+    assert longitude == pytest.approx(44.4945618, abs=1e-6)
+
+
 def test_bridge_publishes_valid_vehicle_state_when_connected() -> None:
     client = FakeMQTTClient()
     bridge = SumoMqttBridge(

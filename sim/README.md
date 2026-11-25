@@ -74,8 +74,10 @@ conversion.
 
 The bridge publishes observed vehicle positions, speed, and heading to
 `vyro/v1/vehicle/state`. It converts SUMO x/y coordinates through the network's
-declared projection with `sumolib.Net.convertXY2LonLat`; it does not interpolate
-bounding boxes or expose hidden simulator state.
+declared projection with `sumolib.Net.convertXY2LonLat`. That conversion applies
+the network's `netOffset`, so pass TraCI's network-local x/y directly without
+adjusting the offset again. It does not interpolate bounding boxes or expose
+hidden simulator state.
 
 ```powershell
 $env:SUMO_HOME = "C:\Program Files (x86)\SUMO"
