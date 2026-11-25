@@ -1,0 +1,56 @@
+[
+  {
+    "traffic_light_id": "11144080253",
+    "program_id": "0",
+    "phase_index": 0,
+    "flow_veh_per_hour": 900
+  },
+  {
+    "traffic_light_id": "11144080256",
+    "program_id": "0",
+    "phase_index": 0,
+    "flow_veh_per_hour": 900
+  },
+  {
+    "traffic_light_id": "11144080257",
+    "program_id": "0",
+    "phase_index": 0,
+    "flow_veh_per_hour": 900
+  },
+  {
+    "traffic_light_id": "11282037248",
+    "program_id": "0",
+    "phase_index": 0,
+    "flow_veh_per_hour": 900
+  },
+  {
+    "traffic_light_id": "12133698754",
+    "program_id": "0",
+    "phase_index": 0,
+    "flow_veh_per_hour": 900
+  },
+  {
+    "traffic_light_id": "12133698755",
+    "program_id": "0",
+    "phase_index": 0,
+    "flow_veh_per_hour": 900
+  },
+  {
+    "traffic_light_id": "12133698756",
+    "program_id": "0",
+    "phase_index": 0,
+    "flow_veh_per_hour": 900
+  },
+  {
+    "traffic_light_id": "12133698757",
+    "program_id": "0",
+    "phase_index": 0,
+    "flow_veh_per_hour": 900
+  },
+  {
+    "traffic_light_id": "3835488429",
+    "program_id": "0",
+    "phase_index": 0,
+    "flow_veh_per_hour": 900
+  }
+]

@@ -1,0 +1,48 @@
+<?xml version='1.0' encoding='utf-8'?>
+<additional>
+  <tlLogic id="11144080253" programID="webster_0" offset="0" type="static">
+    <phase duration="28" state="GG" />
+    <phase duration="4" state="yy" />
+    <phase duration="5" state="rr" />
+  </tlLogic>
+  <tlLogic id="11144080256" programID="webster_0" offset="0" type="static">
+    <phase duration="28" state="GG" />
+    <phase duration="4" state="yy" />
+    <phase duration="5" state="rr" />
+  </tlLogic>
+  <tlLogic id="11144080257" programID="webster_0" offset="0" type="static">
+    <phase duration="28" state="GG" />
+    <phase duration="4" state="yy" />
+    <phase duration="5" state="rr" />
+  </tlLogic>
+  <tlLogic id="11282037248" programID="webster_0" offset="0" type="static">
+    <phase duration="28" state="GG" />
+    <phase duration="4" state="yy" />
+    <phase duration="5" state="rr" />
+  </tlLogic>
+  <tlLogic id="12133698754" programID="webster_0" offset="0" type="static">
+    <phase duration="28" state="GG" />
+    <phase duration="4" state="yy" />
+    <phase duration="5" state="rr" />
+  </tlLogic>
+  <tlLogic id="12133698755" programID="webster_0" offset="0" type="static">
+    <phase duration="28" state="GG" />
+    <phase duration="4" state="yy" />
+    <phase duration="5" state="rr" />
+  </tlLogic>
+  <tlLogic id="12133698756" programID="webster_0" offset="0" type="static">
+    <phase duration="28" state="GG" />
+    <phase duration="4" state="yy" />
+    <phase duration="5" state="rr" />
+  </tlLogic>
+  <tlLogic id="12133698757" programID="webster_0" offset="0" type="static">
+    <phase duration="28" state="GG" />
+    <phase duration="4" state="yy" />
+    <phase duration="5" state="rr" />
+  </tlLogic>
+  <tlLogic id="3835488429" programID="webster_0" offset="0" type="static">
+    <phase duration="28" state="GG" />
+    <phase duration="4" state="yy" />
+    <phase duration="5" state="rr" />
+  </tlLogic>
+</additional>

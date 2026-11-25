@@ -1,4 +1,5 @@
 import json
+import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -18,6 +19,13 @@ NETWORK_FILE = (
     / "osm"
     / "yerevan"
     / "barekamutyun_kievyan.net.xml"
+)
+CANONICAL_NETWORK_FILE = Path(__file__).parents[1] / "net" / "yerevan_v0.net.xml"
+CANONICAL_DEMAND_FILE = (
+    Path(__file__).parents[1] / "plans" / "yerevan_v0_webster_demands.json"
+)
+CANONICAL_PLAN_FILE = (
+    Path(__file__).parents[1] / "plans" / "yerevan_v0_webster.add.xml"
 )
 MULTI_PHASE_NETWORK_FILE = (
     Path(__file__).parents[1]
@@ -224,3 +232,61 @@ def test_writes_parseable_additional_xml(tmp_path: Path) -> None:
     write_fixed_time_additional(NETWORK_FILE, demand_file, output_file)
 
     assert ET.parse(output_file).getroot().tag == "additional"
+
+
+def test_canonical_webster_programs_load_and_run_in_sumo() -> None:
+    sumo_binary = shutil.which("sumo")
+    if sumo_binary is None:
+        pytest.skip("SUMO executable is not installed")
+    traci = pytest.importorskip("traci")
+
+    source_net = sumolib.net.readNet(str(CANONICAL_NETWORK_FILE), withPrograms=True)
+    generated = ET.parse(CANONICAL_PLAN_FILE).getroot().findall("tlLogic")
+    signal_ids = {traffic_light.getID() for traffic_light in source_net.getTrafficLights()}
+
+    assert len(generated) == len(signal_ids)
+    assert {program.get("id") for program in generated} == signal_ids
+    assert all(program.get("programID") == "webster_0" for program in generated)
+    expected = build_fixed_time_additional(
+        CANONICAL_NETWORK_FILE,
+        load_phase_demands(CANONICAL_DEMAND_FILE),
+    )
+    expected_programs = expected.findall("tlLogic")
+    assert [program.attrib for program in generated] == [
+        program.attrib for program in expected_programs
+    ]
+    assert [
+        [phase.attrib for phase in program.findall("phase")] for program in generated
+    ] == [
+        [phase.attrib for phase in program.findall("phase")]
+        for program in expected_programs
+    ]
+
+    traci.start(
+        [
+            sumo_binary,
+            "--net-file",
+            str(CANONICAL_NETWORK_FILE),
+            "--additional-files",
+            str(CANONICAL_PLAN_FILE),
+            "--end",
+            "40",
+            "--no-step-log",
+            "true",
+            "--no-warnings",
+            "true",
+        ]
+    )
+    try:
+        for signal_id in signal_ids:
+            traci.trafficlight.setProgram(signal_id, "webster_0")
+            assert traci.trafficlight.getProgram(signal_id) == "webster_0"
+            assert traci.trafficlight.getPhaseDuration(signal_id) == pytest.approx(28)
+
+        traci.simulationStep(29)
+
+        assert all(
+            traci.trafficlight.getPhase(signal_id) == 1 for signal_id in signal_ids
+        )
+    finally:
+        traci.close()

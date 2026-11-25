@@ -59,12 +59,31 @@ green phase requires demand data keyed by traffic-light ID, program ID, and
 phase index. Yellow and all-red phases are copied unchanged; infeasible
 minimum-green and clearance constraints fail explicitly.
 
+The checked-in Webster plan for the canonical `sim/net/yerevan_v0.net.xml`
+uses the synthetic placeholder demand records in
+`sim/plans/yerevan_v0_webster_demands.json`. These are for exercising the
+pipeline only; each signal uses 900 veh/h, not measured or calibrated traffic
+flow. The generated plan uses 28 seconds green, 4 seconds yellow, and 5 seconds
+all-red at each signal. Regenerate the plan with:
+
 ```powershell
 python sim\generate_fixed_time_plan.py `
-  sim\osm\yerevan\barekamutyun_kievyan.net.xml `
-  sim\phase_demands.json `
-  sim\plans\barekamutyun_webster.add.xml
+  sim\net\yerevan_v0.net.xml `
+  sim\plans\yerevan_v0_webster_demands.json `
+  sim\plans\yerevan_v0_webster.add.xml
 ```
+
+Load the additional file in SUMO with:
+
+```powershell
+sumo --net-file sim\net\yerevan_v0.net.xml `
+  --additional-files sim\plans\yerevan_v0_webster.add.xml `
+  --end 40 --no-step-log true
+```
+
+The additional file adds a `webster_0` static program for every signal. Select
+that program at runtime with TraCI's `trafficlight.setProgram(tls_id,
+"webster_0")`; the network's original program remains unchanged.
 
 SUMO/TraCI APIs are inspected from the installed distribution before use. The
 `sim` Python extra includes sumolib, TraCI, and pyproj for geographic projection
