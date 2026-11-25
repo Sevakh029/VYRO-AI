@@ -1,5 +1,5 @@
 from dataclasses import asdict, fields
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from vyro_backend.adapters import (
     action_to_command,
@@ -11,7 +11,7 @@ from vyro_backend.schemas import IntersectionState, SignalCommand
 from vyro_controller.state import Action, SystemState
 
 
-def test_controller_state_and_action_match_v01_message_shapes() -> None:
+def test_controller_state_and_action_match_v02_message_shapes() -> None:
     assert tuple(field.name for field in fields(SystemState)) == tuple(
         IntersectionState.model_fields
     )
@@ -47,6 +47,7 @@ def test_schema_controller_adapters_round_trip_utc_messages() -> None:
         time_in_phase_s=15.5,
         detector_counts={"north": 4},
         timestamp=timestamp,
+        schema_version="0.3",
     )
     command_message = SignalCommand(
         intersection_id="intersection-1",
@@ -54,6 +55,7 @@ def test_schema_controller_adapters_round_trip_utc_messages() -> None:
         reason="queue pressure",
         timestamp=timestamp,
         command_id="command-1",
+        schema_version="0.3",
     )
 
     state = intersection_to_state(state_message)
@@ -61,5 +63,5 @@ def test_schema_controller_adapters_round_trip_utc_messages() -> None:
 
     assert state_to_intersection(state) == state_message
     assert action_to_command(action) == command_message
-    assert state.timestamp.utcoffset().total_seconds() == 0
-    assert action.timestamp.utcoffset().total_seconds() == 0
+    assert state.timestamp.utcoffset() == timedelta(0)
+    assert action.timestamp.utcoffset() == timedelta(0)

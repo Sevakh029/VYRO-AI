@@ -1,6 +1,6 @@
 """Pure-Python traffic-control library for VYRO."""
 
-from vyro_controller.decide import ControllerConfig, decide
+from vyro_controller.decide import decide
 from vyro_controller.seeds import TEST_SEEDS, TUNING_SEEDS
 from vyro_controller.state import Action, SystemState
 from vyro_controller.webster import (
@@ -12,7 +12,6 @@ from vyro_controller.webster import (
 
 __all__ = [
     "Action",
-    "ControllerConfig",
     "GreenSplit",
     "PhaseFlow",
     "SystemState",
