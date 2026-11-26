@@ -1,9 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createInitialDashboardStore,
   dashboardStoreReducer,
   isStale,
-  pruneExpiredVehicles,
 } from "./store";
 import { STALE_THRESHOLD_MS, VEHICLE_STATE_TTL_MS } from "./types";
 
@@ -35,6 +34,24 @@ function command(commandId: string) {
   };
 }
 
+function acknowledgement(commandId: string) {
+  return {
+    topic: "vyro/v1/controller/ack",
+    schema_version: "0.2",
+    command_id: commandId,
+    signal_id: "signal-1",
+    phase: 2,
+    hold_s: 10,
+    applied: true,
+    reason: "applied",
+    ts_utc: "2026-11-24T12:00:00Z",
+  };
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 function receive(value: unknown, now = receivedAt) {
   return dashboardStoreReducer(createInitialDashboardStore(), {
     type: "message",
@@ -48,15 +65,21 @@ describe("dashboard store", () => {
     const fromMessage = receive(vehicle("vehicle-1", "2026-11-24T11:59:59Z"));
     const fromLocalTime = receive(vehicle("vehicle-2"));
 
+    expect(fromMessage.vehicles["vehicle-1"].value.vehicle_id).toBe("vehicle-1");
     expect(fromMessage.vehicles["vehicle-1"].lastUpdated).toBe(receivedAt - 1000);
     expect(fromLocalTime.vehicles["vehicle-2"].lastUpdated).toBe(receivedAt);
   });
 
-  it("marks retained snapshots stale during reconnect and clears the flag on update", () => {
-    const populated = receive(vehicle("vehicle-1"));
+  it("keeps the latest state per pid and marks it stale on reconnect without duplication", () => {
+    const populated = dashboardStoreReducer(receive(vehicle("vehicle-1")), {
+      type: "message",
+      value: { ...vehicle("vehicle-1"), speed_mps: 9 },
+      receivedAt: receivedAt + 100,
+    });
     const reconnecting = dashboardStoreReducer(populated, { type: "reconnecting" });
 
-    expect(reconnecting.vehicles["vehicle-1"].value.vehicle_id).toBe("vehicle-1");
+    expect(Object.keys(reconnecting.vehicles)).toEqual(["vehicle-1"]);
+    expect(reconnecting.vehicles["vehicle-1"].value.speed_mps).toBe(9);
     expect(isStale(reconnecting.vehicles["vehicle-1"], receivedAt)).toBe(true);
 
     const recovered = dashboardStoreReducer(reconnecting, {
@@ -142,44 +165,65 @@ describe("dashboard store", () => {
     expect(afterLateMock.intersections).toBe(store.intersections);
   });
 
-  it("deduplicates command entries, caps history, and counts malformed messages", () => {
+  it("drops malformed messages and increments droppedMessages", () => {
+    const store = receive(
+      { ...vehicle("bad-vehicle"), speed_mps: "fast" },
+    );
+
+    expect(store.vehicles["bad-vehicle"]).toBeUndefined();
+    expect(store.droppedMessages).toBe(1);
+  });
+
+  it("caps the combined command and acknowledgement history at 100", () => {
     let store = createInitialDashboardStore();
     for (let index = 0; index < 105; index += 1) {
       store = dashboardStoreReducer(store, {
         type: "message",
-        value: command(`command-${index}`),
+        value:
+          index % 2 === 0
+            ? command(`command-${index}`)
+            : acknowledgement(`command-${index}`),
         receivedAt,
       });
     }
 
     store = dashboardStoreReducer(store, {
       type: "message",
-      value: command("command-104"),
+      value: acknowledgement("command-104"),
       receivedAt: receivedAt + 1,
-    });
-    store = dashboardStoreReducer(store, {
-      type: "message",
-      value: { ...vehicle("bad-vehicle"), speed_mps: "fast" },
-      receivedAt,
     });
 
     expect(store.commandHistory).toHaveLength(100);
-    expect(store.commandHistory.at(-1)?.value.command_id).toBe("command-104");
-    expect(store.commandHistory.filter((item) => item.value.command_id === "command-104"))
-      .toHaveLength(1);
-    expect(store.droppedMessages).toBe(1);
+    expect(store.commandHistory.at(-1)?.value.topic).toBe("vyro/v1/controller/ack");
+    expect(
+      store.commandHistory.filter(
+        (item) =>
+          item.value.topic === "vyro/v1/controller/ack" &&
+          item.value.command_id === "command-104",
+      ),
+    ).toHaveLength(1);
   });
 
-  it("ages entries by the configured thresholds and prunes old vehicles", () => {
-    const store = receive(vehicle("vehicle-1"));
+  it("marks entries stale after the threshold using fake time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(receivedAt);
+    const store = receive(vehicle("vehicle-1"), Date.now());
     const item = store.vehicles["vehicle-1"];
 
-    expect(isStale(item, receivedAt + STALE_THRESHOLD_MS)).toBe(false);
-    expect(isStale(item, receivedAt + STALE_THRESHOLD_MS + 1)).toBe(true);
+    expect(isStale(item, Date.now())).toBe(false);
+    vi.advanceTimersByTime(STALE_THRESHOLD_MS + 1);
+    expect(isStale(item, Date.now())).toBe(true);
+  });
+
+  it("removes vehicles after the 15 second TTL using fake time", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(receivedAt);
+    let store = receive(vehicle("vehicle-1"), Date.now());
+
+    vi.advanceTimersByTime(VEHICLE_STATE_TTL_MS + 1);
+    store = dashboardStoreReducer(store, { type: "prune", now: Date.now() });
     expect(
-      Object.keys(
-        pruneExpiredVehicles(store, receivedAt + VEHICLE_STATE_TTL_MS + 1).vehicles,
-      ),
+      Object.keys(store.vehicles),
     ).toEqual([]);
   });
 });

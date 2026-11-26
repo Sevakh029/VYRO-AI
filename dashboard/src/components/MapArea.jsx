@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { CircleMarker, GeoJSON, MapContainer, Popup, TileLayer, Tooltip } from 'react-leaflet'
-import { isStale } from '../store'
+import { CircleMarker, GeoJSON, MapContainer, Popup, TileLayer } from 'react-leaflet'
+import { SignalMarker } from './SignalMarker'
+import { getSignalId } from './signalId'
 import { generateMockIntersectionStates } from '../mockSignals'
 
 const CENTER = [40.20408, 44.49249]
-const PHASE_COLORS = ['#e5534b', '#3ecfb8', '#f0b429']
 let clockNow = Date.now()
 let clockTimer
 const clockSubscribers = new Set()
@@ -41,76 +41,6 @@ function isSignalFeature(feature) {
     Array.isArray(coordinates) &&
     Number.isFinite(coordinates[0]) &&
     Number.isFinite(coordinates[1])
-  )
-}
-
-function getSignalId(feature, index) {
-  const id = feature.properties?.tls_id ?? feature.properties?.name
-  return typeof id === 'string' && id.trim() ? id : `signal-${index}`
-}
-
-function SignalMarker({ feature, index, intersectionsById, now }) {
-  const [longitude, latitude] = feature.geometry.coordinates
-  const signalId = getSignalId(feature, index)
-  const tracked =
-    intersectionsById[signalId] ??
-    Object.values(intersectionsById).find(
-      (item) =>
-        item.value.signal_id === signalId ||
-        item.value.intersection_id === signalId,
-    )
-  const state = tracked?.value
-  const phase = state?.phase ?? state?.phase_id
-  const hasPhase =
-    (typeof phase === 'number' && Number.isFinite(phase)) ||
-    (typeof phase === 'string' && phase.trim().length > 0)
-  const stale = !tracked || isStale(tracked, now) || !hasPhase
-  const secondsInPhase =
-    typeof state?.time_in_phase_s === 'number' &&
-    Number.isFinite(state.time_in_phase_s) &&
-    state.time_in_phase_s >= 0
-      ? state.time_in_phase_s +
-        Math.max(0, Math.floor((now - tracked.lastUpdated) / 1000))
-      : null
-  const phaseText = hasPhase ? String(phase) : 'No data'
-  const timeText =
-    secondsInPhase === null ? '—' : `${Math.floor(secondsInPhase)} s`
-  const numericPhase =
-    typeof phase === 'number' ? phase : Number.parseInt(phaseText, 10)
-  const phaseColorIndex = Number.isFinite(numericPhase)
-    ? ((Math.trunc(numericPhase) % PHASE_COLORS.length) + PHASE_COLORS.length) %
-      PHASE_COLORS.length
-    : phaseText.length % PHASE_COLORS.length
-  const color =
-    stale || !hasPhase
-      ? '#9299a3'
-      : PHASE_COLORS[phaseColorIndex]
-  const lastUpdated =
-    tracked && Number.isFinite(tracked.lastUpdated)
-      ? new Date(tracked.lastUpdated).toLocaleString()
-      : '—'
-  const tooltip = stale ? 'No data' : `Phase ${phaseText} · ${timeText}`
-
-  return (
-    <CircleMarker
-      key={signalId}
-      center={[latitude, longitude]}
-      radius={8}
-      pathOptions={{ color, fillColor: color, fillOpacity: 1, weight: 2 }}
-    >
-      <Tooltip permanent direction="top" offset={[0, -8]}>
-        {tooltip}
-      </Tooltip>
-      <Popup>
-        <strong>{signalId}</strong>
-        <br />
-        Phase: {stale ? 'No data' : phaseText}
-        <br />
-        Time in phase: {stale ? 'No data' : timeText}
-        <br />
-        Last update: {lastUpdated}
-      </Popup>
-    </CircleMarker>
   )
 }
 
