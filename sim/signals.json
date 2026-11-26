@@ -1,0 +1,281 @@
+[
+  {
+    "signal_id": "11144080253",
+    "phases": [
+      {
+        "index": 0,
+        "duration_s": 81.0,
+        "state": "GG"
+      },
+      {
+        "index": 1,
+        "duration_s": 4.0,
+        "state": "yy"
+      },
+      {
+        "index": 2,
+        "duration_s": 5.0,
+        "state": "rr"
+      }
+    ],
+    "valid_phase_indices": [
+      0
+    ],
+    "approaches": [
+      "-487117469#14",
+      "487117469#13"
+    ],
+    "lanes": [
+      "-487117469#14_0",
+      "487117469#13_0"
+    ]
+  },
+  {
+    "signal_id": "11144080256",
+    "phases": [
+      {
+        "index": 0,
+        "duration_s": 81.0,
+        "state": "GG"
+      },
+      {
+        "index": 1,
+        "duration_s": 4.0,
+        "state": "yy"
+      },
+      {
+        "index": 2,
+        "duration_s": 5.0,
+        "state": "rr"
+      }
+    ],
+    "valid_phase_indices": [
+      0
+    ],
+    "approaches": [
+      "-23635021#4",
+      "23635021#3"
+    ],
+    "lanes": [
+      "-23635021#4_0",
+      "23635021#3_0"
+    ]
+  },
+  {
+    "signal_id": "11144080257",
+    "phases": [
+      {
+        "index": 0,
+        "duration_s": 81.0,
+        "state": "GG"
+      },
+      {
+        "index": 1,
+        "duration_s": 4.0,
+        "state": "yy"
+      },
+      {
+        "index": 2,
+        "duration_s": 5.0,
+        "state": "rr"
+      }
+    ],
+    "valid_phase_indices": [
+      0
+    ],
+    "approaches": [
+      "-487117469#12",
+      "487117469#11"
+    ],
+    "lanes": [
+      "-487117469#12_0",
+      "487117469#11_0"
+    ]
+  },
+  {
+    "signal_id": "11282037248",
+    "phases": [
+      {
+        "index": 0,
+        "duration_s": 81.0,
+        "state": "GG"
+      },
+      {
+        "index": 1,
+        "duration_s": 4.0,
+        "state": "yy"
+      },
+      {
+        "index": 2,
+        "duration_s": 5.0,
+        "state": "rr"
+      }
+    ],
+    "valid_phase_indices": [
+      0
+    ],
+    "approaches": [
+      "-23635021#7",
+      "23635021#6"
+    ],
+    "lanes": [
+      "-23635021#7_0",
+      "23635021#6_0"
+    ]
+  },
+  {
+    "signal_id": "12133698754",
+    "phases": [
+      {
+        "index": 0,
+        "duration_s": 81.0,
+        "state": "GG"
+      },
+      {
+        "index": 1,
+        "duration_s": 4.0,
+        "state": "yy"
+      },
+      {
+        "index": 2,
+        "duration_s": 5.0,
+        "state": "rr"
+      }
+    ],
+    "valid_phase_indices": [
+      0
+    ],
+    "approaches": [
+      "-23635021#5",
+      "23635021#4"
+    ],
+    "lanes": [
+      "-23635021#5_0",
+      "23635021#4_0"
+    ]
+  },
+  {
+    "signal_id": "12133698755",
+    "phases": [
+      {
+        "index": 0,
+        "duration_s": 81.0,
+        "state": "GG"
+      },
+      {
+        "index": 1,
+        "duration_s": 4.0,
+        "state": "yy"
+      },
+      {
+        "index": 2,
+        "duration_s": 5.0,
+        "state": "rr"
+      }
+    ],
+    "valid_phase_indices": [
+      0
+    ],
+    "approaches": [
+      "-23635021#2",
+      "23635021#1"
+    ],
+    "lanes": [
+      "-23635021#2_0",
+      "23635021#1_0"
+    ]
+  },
+  {
+    "signal_id": "12133698756",
+    "phases": [
+      {
+        "index": 0,
+        "duration_s": 81.0,
+        "state": "GG"
+      },
+      {
+        "index": 1,
+        "duration_s": 4.0,
+        "state": "yy"
+      },
+      {
+        "index": 2,
+        "duration_s": 5.0,
+        "state": "rr"
+      }
+    ],
+    "valid_phase_indices": [
+      0
+    ],
+    "approaches": [
+      "-487117469#11",
+      "487117469#10"
+    ],
+    "lanes": [
+      "-487117469#11_0",
+      "487117469#10_0"
+    ]
+  },
+  {
+    "signal_id": "12133698757",
+    "phases": [
+      {
+        "index": 0,
+        "duration_s": 81.0,
+        "state": "GG"
+      },
+      {
+        "index": 1,
+        "duration_s": 4.0,
+        "state": "yy"
+      },
+      {
+        "index": 2,
+        "duration_s": 5.0,
+        "state": "rr"
+      }
+    ],
+    "valid_phase_indices": [
+      0
+    ],
+    "approaches": [
+      "-487117469#15",
+      "487117469#14"
+    ],
+    "lanes": [
+      "-487117469#15_0",
+      "487117469#14_0"
+    ]
+  },
+  {
+    "signal_id": "3835488429",
+    "phases": [
+      {
+        "index": 0,
+        "duration_s": 81.0,
+        "state": "GG"
+      },
+      {
+        "index": 1,
+        "duration_s": 4.0,
+        "state": "yy"
+      },
+      {
+        "index": 2,
+        "duration_s": 5.0,
+        "state": "rr"
+      }
+    ],
+    "valid_phase_indices": [
+      0
+    ],
+    "approaches": [
+      "-23635021#8",
+      "23635021#7"
+    ],
+    "lanes": [
+      "-23635021#8_0",
+      "23635021#7_0"
+    ]
+  }
+]

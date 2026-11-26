@@ -10,6 +10,7 @@ from sim.generate_fixed_time_plan import (
     PhaseDemandSettings,
     build_fixed_time_additional,
     load_phase_demands,
+    load_seed,
     required_phase_keys,
     write_fixed_time_additional,
 )
@@ -232,6 +233,36 @@ def test_writes_parseable_additional_xml(tmp_path: Path) -> None:
     write_fixed_time_additional(NETWORK_FILE, demand_file, output_file)
 
     assert ET.parse(output_file).getroot().tag == "additional"
+
+
+def test_seeded_demands_are_deterministic(tmp_path: Path) -> None:
+    demand_file = tmp_path / "demands.json"
+    demand_file.write_text(
+        json.dumps([{
+            "traffic_light_id": "tls-1",
+            "program_id": "0",
+            "phase_index": 0,
+            "flow_veh_per_hour": 900,
+        }]),
+        encoding="utf-8",
+    )
+
+    first = load_phase_demands(demand_file, seed=100)
+    repeated = load_phase_demands(demand_file, seed=100)
+    other = load_phase_demands(demand_file, seed=101)
+
+    assert first == repeated
+    assert first[("tls-1", "0", 0)].flow_veh_per_hour != (
+        other[("tls-1", "0", 0)].flow_veh_per_hour
+    )
+
+
+def test_load_seed_prefers_cli_over_config(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"seed": 100}), encoding="utf-8")
+
+    assert load_seed(config_file, cli_seed=101) == 101
+    assert load_seed(config_file, cli_seed=None) == 100
 
 
 def test_canonical_webster_programs_load_and_run_in_sumo() -> None:

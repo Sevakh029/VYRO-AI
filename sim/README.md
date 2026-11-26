@@ -73,6 +73,11 @@ python sim\generate_fixed_time_plan.py `
   sim\plans\yerevan_v0_webster.add.xml
 ```
 
+Demand generation reads `seed` from `backend/agent_config.json` by default.
+Pass `--seed <integer>` to override the config, or `--config path\to\config.json`
+to choose another JSON config. The seed deterministically varies synthetic
+demand values around their configured baseline.
+
 Load the additional file in SUMO with:
 
 ```powershell
@@ -104,6 +109,12 @@ python sim\sumo_mqtt_bridge.py `
   sim\osm\yerevan\barekamutyun_kievyan.net.xml `
   path\to\routes.rou.xml
 ```
+
+The bridge subscribes to `vyro/v1/controller/command` and validates each
+`intersection_id`/`phase_id` pair against `sim/signals.json` before calling
+TraCI `setPhase`. Invalid or unknown signals publish an acknowledgement with
+`applied=false` and never call TraCI. Use `--signals path\to\signals.json` to
+override the default configuration.
 
   ### End-to-end synthetic smoke scenario
 
@@ -154,3 +165,11 @@ python sim\sumo_mqtt_bridge.py `
 
   It includes road geometries and the 9 signal locations. The source OSM data is
   © OpenStreetMap contributors (ODbL).
+
+## Signal configuration export
+
+Export the canonical network's signal phases and controlled approaches/lanes:
+
+```powershell
+python sim\export_signals.py sim\net\yerevan_v0.net.xml sim\signals.json
+```

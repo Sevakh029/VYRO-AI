@@ -1,7 +1,7 @@
 import threading
-from datetime import UTC, datetime
 
 from .schemas import PreemptionRequest
+from .timestamps import utc_now
 
 
 class PreemptionCoordinator:
@@ -22,7 +22,7 @@ class PreemptionCoordinator:
             vehicle_id=vehicle_id,
             lead_time_s=lead_time_s,
             state="requested",
-            timestamp=datetime.now(UTC),
+            timestamp=utc_now(),
         )
         with self._lock:
             self.requests[vehicle_id] = request

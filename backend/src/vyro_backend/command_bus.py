@@ -3,9 +3,8 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime
-
 from .schemas import ControllerAck, SignalCommand
+from .timestamps import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ class CommandBus:
             intersection_id=intersection_id,
             phase_id=phase_id,
             reason=reason,
-            timestamp=datetime.now(UTC),
+            timestamp=utc_now(),
             command_id=str(uuid.uuid4()),
             schema_version="0.2",
         )

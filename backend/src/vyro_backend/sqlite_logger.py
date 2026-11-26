@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 
+from .timestamps import utc_now
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,7 +19,7 @@ class SQLiteMessageLogger:
         received_at: Callable[[], datetime] | None = None,
     ) -> None:
         self.database_path = Path(database_path)
-        self._received_at = received_at or (lambda: datetime.now(UTC))
+        self._received_at = received_at or utc_now
         self._executor = ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="vyro-sqlite-logger",

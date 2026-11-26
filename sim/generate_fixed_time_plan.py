@@ -3,6 +3,7 @@
 import argparse
 import json
 import math
+import random
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,8 +22,13 @@ class PhaseDemandSettings:
     minimum_green_s: float = 5.0
 
 
-def load_phase_demands(path: Path) -> dict[PhaseKey, PhaseDemandSettings]:
+def load_phase_demands(
+    path: Path,
+    seed: int | None = None,
+) -> dict[PhaseKey, PhaseDemandSettings]:
     """Load per-green-phase demand records from a JSON array."""
+    if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
+        raise ValueError("seed must be an integer")
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, list):
         raise ValueError("phase demand file must contain a JSON array")
@@ -66,8 +72,12 @@ def load_phase_demands(path: Path) -> dict[PhaseKey, PhaseDemandSettings]:
             raise ValueError(f"numeric demand values required for {key}")
         if any(not math.isfinite(value) for value in values):
             raise ValueError(f"numeric demand values must be finite for {key}")
+        flow_veh_per_hour = float(values[0])
+        if seed is not None:
+            rng = random.Random(f"{seed}:{traffic_light_id}:{program_id}:{phase_index}")
+            flow_veh_per_hour *= 0.9 + 0.2 * rng.random()
         demands[key] = PhaseDemandSettings(
-            flow_veh_per_hour=float(values[0]),
+            flow_veh_per_hour=flow_veh_per_hour,
             saturation_flow_veh_per_hour=float(values[1]),
             minimum_green_s=float(values[2]),
         )
@@ -192,12 +202,13 @@ def write_fixed_time_additional(
     min_cycle_s: float = 30.0,
     max_cycle_s: float = 120.0,
     program_prefix: str = "webster",
+    seed: int | None = None,
 ) -> None:
     if network_file.resolve() == output_file.resolve():
         raise ValueError("output file must not overwrite the source network")
     root = build_fixed_time_additional(
         network_file,
-        load_phase_demands(demand_file),
+        load_phase_demands(demand_file, seed=seed),
         min_cycle_s=min_cycle_s,
         max_cycle_s=max_cycle_s,
         program_prefix=program_prefix,
@@ -266,6 +277,24 @@ def _format_seconds(value: float) -> str:
     return f"{value:.6f}".rstrip("0").rstrip(".")
 
 
+def load_seed(config_file: Path | None, cli_seed: int | None) -> int | None:
+    if cli_seed is not None:
+        if isinstance(cli_seed, bool):
+            raise ValueError("seed must be an integer")
+        return cli_seed
+    if config_file is None:
+        return None
+    if not config_file.is_file():
+        raise FileNotFoundError(f"configuration does not exist: {config_file}")
+    data = json.loads(config_file.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("configuration must be a JSON object")
+    seed = data.get("seed")
+    if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
+        raise ValueError("seed must be an integer")
+    return seed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate Webster-timed SUMO traffic-light programs."
@@ -276,7 +305,14 @@ def main() -> None:
     parser.add_argument("--min-cycle", type=float, default=30.0)
     parser.add_argument("--max-cycle", type=float, default=120.0)
     parser.add_argument("--program-prefix", default="webster")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path(__file__).resolve().parents[1] / "backend" / "agent_config.json",
+    )
+    parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()
+    seed = load_seed(args.config, args.seed)
     write_fixed_time_additional(
         args.network,
         args.demands,
@@ -284,6 +320,7 @@ def main() -> None:
         min_cycle_s=args.min_cycle,
         max_cycle_s=args.max_cycle,
         program_prefix=args.program_prefix,
+        seed=seed,
     )
 
 
