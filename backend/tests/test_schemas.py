@@ -43,10 +43,12 @@ UTC_TIMESTAMP = "2026-11-20T10:00:00Z"
         (
             SignalCommand,
             {
-                "intersection_id": "intersection-1",
-                "phase_id": 1,
+                "command_id": "command-1",
+                "signal_id": "signal-1",
+                "phase": 1,
+                "hold_s": 15.0,
                 "reason": "queue_pressure",
-                "timestamp": UTC_TIMESTAMP,
+                "ts_utc": UTC_TIMESTAMP,
             },
         ),
         (
@@ -71,10 +73,12 @@ UTC_TIMESTAMP = "2026-11-20T10:00:00Z"
             ControllerAck,
             {
                 "command_id": "command-1",
-                "intersection_id": "intersection-1",
+                "signal_id": "signal-1",
+                "phase": 1,
+                "hold_s": 15.0,
                 "applied": True,
                 "reason": "phase applied",
-                "timestamp": UTC_TIMESTAMP,
+                "ts_utc": UTC_TIMESTAMP,
             },
         ),
         (
@@ -91,7 +95,9 @@ UTC_TIMESTAMP = "2026-11-20T10:00:00Z"
 )
 def test_valid_schema_instances(model: type, payload: dict) -> None:
     instance = model.model_validate(payload)
-    assert instance.timestamp.tzinfo is not None
+    timestamp = getattr(instance, "ts_utc", getattr(instance, "timestamp", None))
+    assert timestamp is not None
+    assert timestamp.tzinfo is not None
 
 
 @pytest.mark.parametrize(
@@ -119,10 +125,12 @@ def test_valid_schema_instances(model: type, payload: dict) -> None:
         (
             SignalCommand,
             {
-                "intersection_id": "intersection-1",
-                "phase_id": 1,
+                "command_id": "command-1",
+                "signal_id": "signal-1",
+                "phase": 1,
+                "hold_s": 15.0,
                 "reason": "",
-                "timestamp": UTC_TIMESTAMP,
+                "ts_utc": UTC_TIMESTAMP,
             },
         ),
         (
@@ -220,7 +228,8 @@ def test_schema_version_defaults_to_0_2_and_accepts_explicit_value() -> None:
 def test_schema_models_reject_naive_timestamps(model: type, example_name: str) -> None:
     example_path = Path(__file__).parents[2] / "schemas" / "examples" / example_name
     payload = json.loads(example_path.read_text(encoding="utf-8"))
-    payload["timestamp"] = "2026-11-24T10:00:00"
+    timestamp_field = "ts_utc" if "signal_command" in example_name or "controller_ack" in example_name else "timestamp"
+    payload[timestamp_field] = "2026-11-24T10:00:00"
 
     with pytest.raises(ValidationError, match="timezone-aware UTC"):
         model.model_validate(payload)

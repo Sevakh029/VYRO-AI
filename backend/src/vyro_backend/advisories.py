@@ -2,6 +2,8 @@ from typing import Protocol
 
 from .schemas import VehicleAdvisory
 
+ADVISORY_TOPIC = "vyro/v1/vehicle/advisory"
+
 
 class AdvisoryMQTTPublisher(Protocol):
     def publish(
@@ -15,7 +17,8 @@ class AdvisoryMQTTPublisher(Protocol):
 def advisory_topic(vehicle_id: str) -> str:
     if not vehicle_id:
         raise ValueError("vehicle_id must not be empty")
-    return f"vyro/vehicle/{vehicle_id}/advisory"
+    del vehicle_id
+    return ADVISORY_TOPIC
 
 
 class AdvisoryPublisher:

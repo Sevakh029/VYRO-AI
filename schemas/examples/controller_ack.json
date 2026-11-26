@@ -1,8 +1,10 @@
 {
   "schema_version": "0.2",
   "command_id": "5f8a0c6e-0b88-4a3e-8e10-6cf4e9a4c001",
-  "intersection_id": "intersection-1",
+  "signal_id": "signal-1",
+  "phase": 1,
+  "hold_s": 15.0,
   "applied": true,
   "reason": "phase applied",
-  "timestamp": "2026-11-20T10:00:00Z"
+  "ts_utc": "2026-11-20T10:00:00Z"
 }

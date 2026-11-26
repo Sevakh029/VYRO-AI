@@ -4,6 +4,7 @@ from threading import Lock
 
 from pydantic import ValidationError
 
+from .command_bus import AcknowledgementHandler
 from .in_memory_state import InMemoryTrafficState
 from .schemas import (
     ControllerAck,
@@ -38,10 +39,12 @@ class MQTTMessageHandler:
         websocket_manager: WebSocketManager,
         sqlite_logger: SQLiteMessageLogger | None = None,
         traffic_state: InMemoryTrafficState | None = None,
+        acknowledgement_handler: AcknowledgementHandler | None = None,
     ) -> None:
         self.websocket_manager = websocket_manager
         self.sqlite_logger = sqlite_logger
         self.traffic_state = traffic_state
+        self.acknowledgement_handler = acknowledgement_handler
         self.rate_limiter = RateLimiter()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._loop_lock = Lock()
@@ -100,6 +103,11 @@ class MQTTMessageHandler:
             return False
         if self.sqlite_logger is not None:
             self.sqlite_logger.log_async(topic, payload, valid=True)
+        if (
+            isinstance(message, ControllerAck)
+            and self.acknowledgement_handler is not None
+        ):
+            self.acknowledgement_handler.receive(topic, payload)
 
         message_data = message.model_dump(mode="json")
         if self.traffic_state is not None:
@@ -114,6 +122,8 @@ class MQTTMessageHandler:
             if loop is not None and loop.is_running():
                 loop.call_soon_threadsafe(self._schedule_broadcast, topic, message_data)
         entity_id = getattr(message, "vehicle_id", None) or getattr(
+            message, "signal_id", None
+        ) or getattr(
             message, "intersection_id", None
         )
         return entity_id or True

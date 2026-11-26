@@ -113,10 +113,12 @@ def test_invalid_message_is_not_broadcast_or_stored(tmp_path, monkeypatch) -> No
             "vyro/v1/controller/ack",
             {
                 "command_id": "command-1",
-                "intersection_id": "intersection-1",
+                "signal_id": "signal-1",
+                "phase": 1,
+                "hold_s": 15.0,
                 "applied": True,
                 "reason": "applied",
-                "timestamp": "2026-11-21T10:00:00Z",
+                "ts_utc": "2026-11-21T10:00:00Z",
             },
         ),
         (

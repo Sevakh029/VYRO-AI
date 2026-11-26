@@ -6,6 +6,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .command_bus import AcknowledgementHandler, CommandBus, MQTTCommandPublisher
 from .in_memory_state import InMemoryTrafficState
 from .latency import LatencyHistogram
 from .message_handler import MQTTMessageHandler
@@ -19,18 +20,23 @@ command_latency = LatencyHistogram()
 sqlite_message_logger = SQLiteMessageLogger(
     os.getenv("VYRO_SQLITE_DB_PATH", "data/vyro_messages.db")
 )
+mqtt_subscriber = MQTTSubscriber(
+    host=os.getenv("MQTT_HOST", "127.0.0.1"),
+    port=int(os.getenv("MQTT_PORT", "1883")),
+    username=os.getenv("MQTT_USERNAME"),
+    password=os.getenv("MQTT_PASSWORD"),
+)
+acknowledgement_bus = CommandBus(
+    MQTTCommandPublisher(mqtt_subscriber.client),
+    timeout_s=float(os.getenv("VYRO_COMMAND_ACK_TIMEOUT_S", "2")),
+)
 mqtt_message_handler = MQTTMessageHandler(
     websocket_manager,
     sqlite_message_logger,
     traffic_state,
+    AcknowledgementHandler(acknowledgement_bus),
 )
-mqtt_subscriber = MQTTSubscriber(
-    host=os.getenv("MQTT_HOST", "127.0.0.1"),
-    port=int(os.getenv("MQTT_PORT", "1883")),
-    on_message=mqtt_message_handler,
-    username=os.getenv("MQTT_USERNAME"),
-    password=os.getenv("MQTT_PASSWORD"),
-)
+mqtt_subscriber._on_message = mqtt_message_handler
 
 
 @asynccontextmanager
