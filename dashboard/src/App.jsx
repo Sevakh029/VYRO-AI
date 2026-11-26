@@ -10,7 +10,7 @@ function App() {
   const [simulatedAlerts, setSimulatedAlerts] = useState(0)
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const backendHost = import.meta.env.VITE_BACKEND_WS_HOST || '127.0.0.1:8000'
-  const { status, store } = useWebSocket(
+  const { status, store, ingestMockMessage } = useWebSocket(
     `${protocol}//${backendHost}/ws`,
   )
   const connectionStatus =
@@ -56,7 +56,15 @@ function App() {
       <main className="dashboard-main">
         <KpiPanel metrics={metrics} />
         <div className="dashboard-grid">
-          <MapArea vehicles={vehicleList} />
+          <MapArea
+            vehicles={vehicleList}
+            intersectionsById={store.intersections}
+            useMockSignals={
+              import.meta.env.VITE_USE_MOCK_SIGNALS === 'true' &&
+              !store.hasLiveIntersectionData
+            }
+            onMockMessage={ingestMockMessage}
+          />
           <NetworkActivity
             online={vehicleList.length}
             offline={0}

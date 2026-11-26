@@ -17,6 +17,7 @@ export interface TrackedItem<T> {
   value: T;
   lastUpdated: number;
   stale: boolean;
+  source: "live" | "mock";
 }
 
 export interface DashboardStore {
@@ -25,6 +26,7 @@ export interface DashboardStore {
   commandHistory: TrackedItem<CommandMessage | AckMessage>[];
   metrics: TrackedItem<MetricsSnapshot> | null;
   advisories: Record<string, TrackedItem<AuxiliaryTopicMessage>>;
+  hasLiveIntersectionData: boolean;
   status: WebSocketStatus;
   droppedMessages: number;
 }
@@ -32,7 +34,12 @@ export interface DashboardStore {
 export type DashboardStoreAction =
   | { type: "status"; status: WebSocketStatus }
   | { type: "reconnecting" }
-  | { type: "message"; value: unknown; receivedAt: number }
+  | {
+      type: "message";
+      value: unknown;
+      receivedAt: number;
+      source?: "live" | "mock";
+    }
   | { type: "prune"; now: number }
   | { type: "dropped-message" };
 
@@ -43,6 +50,7 @@ export function createInitialDashboardStore(): DashboardStore {
     commandHistory: [],
     metrics: null,
     advisories: {},
+    hasLiveIntersectionData: false,
     status: "connecting",
     droppedMessages: 0,
   };
@@ -86,8 +94,12 @@ function markStoreStale(store: DashboardStore): DashboardStore {
   };
 }
 
-function tracked<T>(value: T, lastUpdated: number): TrackedItem<T> {
-  return { value, lastUpdated, stale: false };
+function tracked<T>(
+  value: T,
+  lastUpdated: number,
+  source: "live" | "mock",
+): TrackedItem<T> {
+  return { value, lastUpdated, stale: false, source };
 }
 
 function getSignalId(message: IntersectionState): string {
@@ -122,6 +134,7 @@ function updateMessage(
   store: DashboardStore,
   message: DashboardMessage,
   receivedAt: number,
+  source: "live" | "mock",
 ): DashboardStore {
   const lastUpdated = messageTimestamp(message, receivedAt);
 
@@ -131,15 +144,25 @@ function updateMessage(
         ...store,
         vehicles: {
           ...store.vehicles,
-          [message.vehicle_id]: tracked(message, lastUpdated),
+          [message.vehicle_id]: tracked(message, lastUpdated, source),
         },
       };
     case "vyro/v1/intersection/state":
+      const currentIntersections =
+        source === "live"
+          ? Object.fromEntries(
+              Object.entries(store.intersections).filter(
+                ([, item]) => item.source !== "mock",
+              ),
+            )
+          : store.intersections;
       return {
         ...store,
+        hasLiveIntersectionData:
+          store.hasLiveIntersectionData || source === "live",
         intersections: {
-          ...store.intersections,
-          [getSignalId(message)]: tracked(message, lastUpdated),
+          ...currentIntersections,
+          [getSignalId(message)]: tracked(message, lastUpdated, source),
         },
       };
     case "vyro/v1/controller/command":
@@ -148,11 +171,11 @@ function updateMessage(
         ...store,
         commandHistory: upsertCommand(
           store.commandHistory,
-          tracked(message, lastUpdated),
+          tracked(message, lastUpdated, source),
         ),
       };
     case "vyro/v1/metrics/snapshot":
-      return { ...store, metrics: tracked(message, lastUpdated) };
+      return { ...store, metrics: tracked(message, lastUpdated, source) };
     case "vyro/v1/vehicle/advisory": {
       const key =
         message.vehicle_id ??
@@ -164,7 +187,7 @@ function updateMessage(
         ...store,
         advisories: {
           ...store.advisories,
-          [key]: tracked(message, lastUpdated),
+          [key]: tracked(message, lastUpdated, source),
         },
       };
     }
@@ -202,9 +225,18 @@ export function dashboardStoreReducer(
       return { ...store, droppedMessages: store.droppedMessages + 1 };
     case "message": {
       const message = parseTopicMessage(action.value);
-      return message
-        ? updateMessage(store, message, action.receivedAt)
-        : { ...store, droppedMessages: store.droppedMessages + 1 };
+      const source = action.source ?? "live";
+      if (!message) {
+        return { ...store, droppedMessages: store.droppedMessages + 1 };
+      }
+      if (
+        source === "mock" &&
+        (message.topic !== "vyro/v1/intersection/state" ||
+          store.hasLiveIntersectionData)
+      ) {
+        return store;
+      }
+      return updateMessage(store, message, action.receivedAt, source);
     }
   }
 }

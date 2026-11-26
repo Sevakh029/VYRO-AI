@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import {
   createInitialDashboardStore,
   dashboardStoreReducer,
@@ -10,6 +10,11 @@ export function useWebSocket(url: string) {
     dashboardStoreReducer,
     undefined,
     createInitialDashboardStore,
+  );
+  const ingestMockMessage = useCallback(
+    (value: unknown) =>
+      dispatch({ type: "message", value, receivedAt: Date.now(), source: "mock" }),
+    [dispatch],
   );
 
   useEffect(() => {
@@ -56,5 +61,5 @@ export function useWebSocket(url: string) {
     };
   }, [url]);
 
-  return { status: store.status, store };
+  return { status: store.status, store, ingestMockMessage };
 }
