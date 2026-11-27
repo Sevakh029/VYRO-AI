@@ -15,16 +15,24 @@ from paho.mqtt.enums import CallbackAPIVersion
 from paho.mqtt.properties import Properties
 from paho.mqtt.reasoncodes import ReasonCode
 from pydantic import ValidationError
-from vyro_backend.schemas import ControllerAck, SignalCommand, VehicleState
+from vyro_backend.schemas import (
+    ControllerAck,
+    IntersectionState,
+    SignalCommand,
+    VehicleState,
+)
 from vyro_backend.timestamps import utc_now
 
 VEHICLE_STATE_TOPIC = "vyro/v1/vehicle/state"
+INTERSECTION_STATE_TOPIC = "vyro/v1/intersection/state"
 COMMAND_TOPIC = "vyro/v1/controller/command"
 ACK_TOPIC = "vyro/v1/controller/ack"
 MQTT_CONNECT_TIMEOUT_SECONDS = 10.0
 
 
-def load_signals_config(signals_file: Path) -> dict[str, tuple[int, ...]]:
+def _load_signals_config(
+    signals_file: Path,
+) -> tuple[dict[str, tuple[int, ...]], dict[str, dict[str, tuple[str, ...]]]]:
     if not signals_file.is_file():
         raise FileNotFoundError(f"Signals configuration does not exist: {signals_file}")
     data = json.loads(signals_file.read_text(encoding="utf-8"))
@@ -32,6 +40,7 @@ def load_signals_config(signals_file: Path) -> dict[str, tuple[int, ...]]:
         raise ValueError("signals.json must contain a JSON array")
 
     signals: dict[str, tuple[int, ...]] = {}
+    approach_lanes: dict[str, dict[str, tuple[str, ...]]] = {}
     for record in data:
         if not isinstance(record, dict):
             raise ValueError("each signals.json record must be a JSON object")
@@ -49,6 +58,29 @@ def load_signals_config(signals_file: Path) -> dict[str, tuple[int, ...]]:
         if signal_id in signals:
             raise ValueError(f"duplicate signal_id in signals.json: {signal_id}")
         signals[signal_id] = tuple(valid_indices)
+
+        lanes = record.get("lanes", [])
+        if not isinstance(lanes, list) or any(
+            not isinstance(lane, str) or not lane for lane in lanes
+        ):
+            raise ValueError(f"signal {signal_id} has invalid lanes")
+        lane_groups: dict[str, list[str]] = {}
+        for lane in lanes:
+            approach_id, separator, lane_index = lane.rpartition("_")
+            if not approach_id or not separator or not lane_index.isdigit():
+                raise ValueError(f"signal {signal_id} has invalid lane ID: {lane}")
+            if lane in lane_groups.get(approach_id, []):
+                raise ValueError(f"signal {signal_id} has duplicate lane ID: {lane}")
+            lane_groups.setdefault(approach_id, []).append(lane)
+        approach_lanes[signal_id] = {
+            approach_id: tuple(sorted(group))
+            for approach_id, group in sorted(lane_groups.items())
+        }
+    return signals, approach_lanes
+
+
+def load_signals_config(signals_file: Path) -> dict[str, tuple[int, ...]]:
+    signals, _ = _load_signals_config(signals_file)
     return signals
 
 
@@ -78,9 +110,12 @@ class SumoMqttBridge:
         if signals_file is None:
             signals_file = Path(__file__).resolve().parents[1] / "signals.json"
         try:
-            self.signals = load_signals_config(Path(signals_file))
+            self.signals, self.signal_approach_lanes = _load_signals_config(
+                Path(signals_file)
+            )
         except FileNotFoundError:
             self.signals = {}
+            self.signal_approach_lanes = {}
         self._traci: Any | None = None
         self._pending_commands: list[bytes] = []
 
@@ -254,6 +289,39 @@ class SumoMqttBridge:
                 published += 1
         return published
 
+    def publish_intersection_states(
+        self,
+        traci: Any,
+        timestamp: datetime | None = None,
+    ) -> int:
+        if not self.connected:
+            return 0
+        current_timestamp = timestamp or utc_now()
+        published = 0
+        for signal_id, approach_lanes in self.signal_approach_lanes.items():
+            detector_counts = {
+                approach_id: sum(
+                    traci.lane.getLastStepVehicleNumber(lane_id)
+                    for lane_id in lane_ids
+                )
+                for approach_id, lane_ids in approach_lanes.items()
+            }
+            state = IntersectionState(
+                intersection_id=signal_id,
+                phase_id=traci.trafficlight.getPhase(signal_id),
+                time_in_phase_s=traci.trafficlight.getSpentDuration(signal_id),
+                detector_counts=detector_counts,
+                timestamp=current_timestamp,
+            )
+            result = self.client.publish(
+                INTERSECTION_STATE_TOPIC,
+                state.model_dump_json(),
+                qos=1,
+            )
+            if getattr(result, "rc", mqtt.MQTT_ERR_SUCCESS) == mqtt.MQTT_ERR_SUCCESS:
+                published += 1
+        return published
+
 
 def load_network(network_file: Path) -> Any:
     import sumolib
@@ -316,6 +384,7 @@ def main() -> None:
             traci.simulationStep()
             bridge.process_pending_commands()
             bridge.publish_positions(traci)
+            bridge.publish_intersection_states(traci)
     finally:
         try:
             if traci_started:

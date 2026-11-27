@@ -97,11 +97,16 @@ conversion.
 ## TraCI to MQTT
 
 The bridge publishes observed vehicle positions, speed, and heading to
-`vyro/v1/vehicle/state`. It converts SUMO x/y coordinates through the network's
-declared projection with `sumolib.Net.convertXY2LonLat`. That conversion applies
-the network's `netOffset`, so pass TraCI's network-local x/y directly without
-adjusting the offset again. It does not interpolate bounding boxes or expose
-hidden simulator state.
+`vyro/v1/vehicle/state` and publishes one `IntersectionState` per configured
+signal to `vyro/v1/intersection/state` on each simulation step. Intersection
+states include the active phase, elapsed phase time, and per-approach
+`detector_counts` summed from the configured incoming lanes' last-step vehicle
+counts. The schema's UTC field is named `timestamp`. Vehicle positions are
+converted from SUMO x/y coordinates through the network's declared projection
+with `sumolib.Net.convertXY2LonLat`. That conversion applies the network's
+`netOffset`, so pass TraCI's network-local x/y directly without adjusting the
+offset again. It does not interpolate bounding boxes or expose hidden simulator
+state.
 
 ```powershell
 $env:SUMO_HOME = "C:\Program Files (x86)\SUMO"
@@ -116,55 +121,50 @@ TraCI `setPhase`. Invalid or unknown signals publish an acknowledgement with
 `applied=false` and never call TraCI. Use `--signals path\to\signals.json` to
 override the default configuration.
 
-  ### End-to-end synthetic smoke scenario
+## Seeded 15-minute demand run
 
-  The following produces deterministic, synthetic demand for integration testing.
-  It is not a traffic estimate or an experiment result. SUMO's `--validate` option
-  routes each trip and retries trips that cannot be connected through the OSM
-  extract. SUMO may warn about rejected samples while it is retrying.
+Run a repeatable, synthetic normal-demand scenario with a chosen seed:
 
-  ```powershell
-  New-Item -ItemType Directory -Force sim\output | Out-Null
-  Push-Location sim\output
-  try {
-  python "$env:SUMO_HOME\tools\randomTrips.py" `
-    --net-file ..\net\yerevan_v0.net.xml `
-    --route-file yerevan-smoke.rou.xml `
-    --begin 0 --end 120 --period 2 --seed 23 --min-distance 50 --validate
-  } finally {
-    Pop-Location
-  }
-  ```
+```powershell
+python sim\run_demand_scenario.py --seed 23
+```
 
-  With the broker and backend running via `docker compose up -d --build`, start
-  the dashboard with `npm run dev` from `dashboard/`, then publish actual TraCI
-  positions:
+The scenario generates one trip every two seconds for 900 seconds, using the
+seed for both route generation and SUMO. It disables teleporting and allows a
+further 900 seconds for vehicles to clear. The runner fails if vehicles remain,
+trips are unfinished, or SUMO reports teleports or collisions. Outputs are
+written under ignored `sim/output/`. This is a deterministic synthetic load
+test, not measured or calibrated traffic demand.
 
-  ```powershell
-  $env:SUMO_HOME = "C:\Program Files (x86)\SUMO"
-  $env:MQTT_HOST = "127.0.0.1"
-  $env:MQTT_PORT = "1883"
-  $env:MQTT_USERNAME = "your-user"
-  $env:MQTT_PASSWORD = "your-password"
-  python sim\sumo_mqtt_bridge.py `
-    sim\net\yerevan_v0.net.xml `
-    sim\output\yerevan-smoke.rou.xml
-  ```
+With the broker and backend running via `docker compose up -d --build`, start
+the dashboard with `npm run dev` from `dashboard/`, then publish actual TraCI
+positions:
 
-  The bridge waits for a successful MQTT connection before starting SUMO; a
-  broker connection failure is reported rather than silently dropping the first
-  vehicle states. The route file and SUMO run outputs are ignored by Git.
+```powershell
+$env:SUMO_HOME = "C:\Program Files (x86)\SUMO"
+$env:MQTT_HOST = "127.0.0.1"
+$env:MQTT_PORT = "1883"
+$env:MQTT_USERNAME = "your-user"
+$env:MQTT_PASSWORD = "your-password"
+python sim\sumo_mqtt_bridge.py `
+  sim\net\yerevan_v0.net.xml `
+  sim\output\normal_seed23.rou.xml
+```
 
-  The dashboard's `yerevan_network.geojson` is exported from this same canonical
-  network with:
+The bridge waits for a successful MQTT connection before starting SUMO; a
+broker connection failure is reported rather than silently dropping the first
+vehicle states. The route file and SUMO run outputs are ignored by Git.
 
-  ```powershell
-  python sim\export_geojson.py sim\net\yerevan_v0.net.xml `
-    dashboard\public\yerevan_network.geojson
-  ```
+The dashboard's `yerevan_network.geojson` is exported from this same canonical
+network with:
 
-  It includes road geometries and the 9 signal locations. The source OSM data is
-  © OpenStreetMap contributors (ODbL).
+```powershell
+python sim\export_geojson.py sim\net\yerevan_v0.net.xml `
+  dashboard\public\yerevan_network.geojson
+```
+
+It includes road geometries and the 9 signal locations. The source OSM data is
+© OpenStreetMap contributors (ODbL).
 
 ## Signal configuration export
 
