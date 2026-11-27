@@ -1,11 +1,19 @@
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
-from vyro_backend.schemas import ControllerAck, SignalCommand, VehicleState
+from vyro_backend.schemas import (
+    ControllerAck,
+    IntersectionState,
+    SignalCommand,
+    VehicleState,
+)
 
 from sim.sumo_mqtt_bridge import (
     ACK_TOPIC,
+    COMMAND_TOPIC,
+    INTERSECTION_STATE_TOPIC,
     NetworkProjection,
     SumoMqttBridge,
     load_network,
@@ -20,7 +28,11 @@ class FakePublishResult:
 class FakeMQTTClient:
     def __init__(self) -> None:
         self.published: list[tuple[str, str, int]] = []
+        self.subscriptions: list[tuple[str, int]] = []
         self.publish_rc = 0
+
+    def subscribe(self, topic: str, qos: int) -> None:
+        self.subscriptions.append((topic, qos))
 
     def publish(self, topic: str, payload: str, qos: int) -> FakePublishResult:
         self.published.append((topic, payload, qos))
@@ -48,6 +60,17 @@ class FakeTraCI:
     vehicle = FakeVehicleAPI()
 
 
+class FakeLaneAPI:
+    counts = {
+        "approach_north_0": 2,
+        "approach_north_1": 3,
+        "approach_south_0": 4,
+    }
+
+    def getLastStepVehicleNumber(self, lane_id: str) -> int:
+        return self.counts[lane_id]
+
+
 class FakeTrafficLightAPI:
     def __init__(self) -> None:
         self.phase = 0
@@ -65,6 +88,21 @@ class FakeTrafficLightAPI:
 class FakePhaseTraCI:
     def __init__(self) -> None:
         self.trafficlight = FakeTrafficLightAPI()
+
+
+class FakeIntersectionTraCI:
+    lane = FakeLaneAPI()
+
+    class TrafficLightAPI:
+        def getPhase(self, signal_id: str) -> int:
+            del signal_id
+            return 2
+
+        def getSpentDuration(self, signal_id: str) -> float:
+            del signal_id
+            return 15.5
+
+    trafficlight = TrafficLightAPI()
 
 
 class FakeReasonCode:
@@ -141,12 +179,13 @@ def test_bridge_skips_publish_when_disconnected() -> None:
 
 
 def test_paho_v2_connect_callback_sets_connection_state() -> None:
+    client = FakeMQTTClient()
     bridge = SumoMqttBridge(
         NetworkProjection(lambda x, y: (44.492, 40.206)),
-        FakeMQTTClient(),  # type: ignore[arg-type]
+        client,  # type: ignore[arg-type]
     )
 
-    bridge.on_connect(None, None, None, FakeReasonCode(False), None)  # type: ignore[arg-type]
+    bridge.on_connect(client, None, None, FakeReasonCode(False), None)  # type: ignore[arg-type]
 
     assert bridge.connected is True
     bridge.wait_until_connected(timeout=0)
@@ -198,6 +237,56 @@ def test_bridge_counts_only_successful_mqtt_publish_results() -> None:
 
     assert bridge.publish_positions(FakeTraCI()) == 0
     assert len(client.published) == 1
+
+
+def test_bridge_publishes_intersection_state_with_per_approach_detector_counts(
+    tmp_path: Path,
+) -> None:
+    signals_file = tmp_path / "signals.json"
+    signals_file.write_text(
+        '[{"signal_id":"signal-1","valid_phase_indices":[0,1,2],'
+        '"approaches":["approach_north","approach_south"],'
+        '"lanes":["approach_north_0","approach_north_1","approach_south_0"]}]',
+        encoding="utf-8",
+    )
+    client = FakeMQTTClient()
+    bridge = SumoMqttBridge(
+        NetworkProjection(lambda x, y: (44.492, 40.206)),
+        client,  # type: ignore[arg-type]
+        signals_file=signals_file,
+    )
+    bridge.connected = True
+    timestamp = datetime(2026, 11, 24, 12, tzinfo=UTC)
+
+    assert bridge.publish_intersection_states(FakeIntersectionTraCI(), timestamp) == 1
+
+    topic, payload, qos = client.published[0]
+    state = IntersectionState.model_validate_json(payload)
+    assert topic == INTERSECTION_STATE_TOPIC
+    assert qos == 1
+    assert state.intersection_id == "signal-1"
+    assert state.phase_id == 2
+    assert state.time_in_phase_s == 15.5
+    assert state.detector_counts == {"approach_north": 5, "approach_south": 4}
+    assert state.timestamp == timestamp
+
+
+def test_bridge_skips_intersection_publish_when_disconnected(tmp_path: Path) -> None:
+    signals_file = tmp_path / "signals.json"
+    signals_file.write_text(
+        '[{"signal_id":"signal-1","valid_phase_indices":[0],'
+        '"lanes":["approach_north_0"]}]',
+        encoding="utf-8",
+    )
+    client = FakeMQTTClient()
+    bridge = SumoMqttBridge(
+        NetworkProjection(lambda x, y: (44.492, 40.206)),
+        client,  # type: ignore[arg-type]
+        signals_file=signals_file,
+    )
+
+    assert bridge.publish_intersection_states(FakeIntersectionTraCI()) == 0
+    assert client.published == []
 
 
 def test_bridge_rejects_invalid_phase_without_changing_traci(tmp_path: Path) -> None:
@@ -260,3 +349,60 @@ def test_bridge_applies_valid_phase(tmp_path: Path) -> None:
 
     assert result["applied"] is True
     assert traci.trafficlight.calls == [("signal-1", 1)]
+
+
+@pytest.mark.parametrize(
+    ("phase_id", "expected_applied", "expected_phase", "expected_reason"),
+    [
+        (1, True, 1, "phase applied"),
+        (99, False, 0, "invalid phase index 99"),
+    ],
+)
+def test_bridge_processes_mqtt_phase_commands_and_publishes_ack(
+    tmp_path: Path,
+    phase_id: int,
+    expected_applied: bool,
+    expected_phase: int,
+    expected_reason: str,
+) -> None:
+    signals_file = tmp_path / "signals.json"
+    signals_file.write_text(
+        '[{"signal_id":"signal-1","valid_phase_indices":[0,1]}]',
+        encoding="utf-8",
+    )
+    client = FakeMQTTClient()
+    bridge = SumoMqttBridge(
+        NetworkProjection(lambda x, y: (44.492, 40.206)),
+        client,  # type: ignore[arg-type]
+        signals_file=signals_file,
+    )
+    traci = FakePhaseTraCI()
+    bridge.set_traci(traci)
+    bridge.on_connect(client, None, None, FakeReasonCode(False), None)  # type: ignore[arg-type]
+    command = SignalCommand(
+        intersection_id="signal-1",
+        phase_id=phase_id,
+        reason="queue_pressure",
+        timestamp=datetime(2026, 11, 24, 12, tzinfo=UTC),
+        command_id="command-1",
+    )
+    bridge.on_message(
+        client,
+        None,
+        SimpleNamespace(topic=COMMAND_TOPIC, payload=command.model_dump_json().encode()),
+    )
+
+    assert bridge.process_pending_commands() == 1
+
+    assert client.subscriptions == [(COMMAND_TOPIC, 1)]
+    assert traci.trafficlight.calls == (
+        [("signal-1", phase_id)] if expected_applied else []
+    )
+    assert traci.trafficlight.getPhase("signal-1") == expected_phase
+    topic, payload, qos = client.published[-1]
+    ack = ControllerAck.model_validate_json(payload)
+    assert topic == ACK_TOPIC
+    assert qos == 1
+    assert ack.command_id == "command-1"
+    assert ack.applied is expected_applied
+    assert expected_reason in ack.reason
