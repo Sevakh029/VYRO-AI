@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 import pytest
 from vyro_backend.message_handler import MQTTMessageHandler
+from vyro_backend.schemas import ControllerAck, SignalCommand
 from vyro_backend.sqlite_logger import SQLiteMessageLogger
 from vyro_backend.websocket_manager import WebSocketManager
 
@@ -292,3 +293,84 @@ def test_async_database_error_is_reported(tmp_path, monkeypatch, caplog) -> None
     assert logger.last_error == "database unavailable"
     assert "Unable to initialize SQLite message logger" in caplog.text
     logger.close()
+
+
+def test_command_acknowledgement_correlation_and_duplicate_deduplication(tmp_path) -> None:
+    database = tmp_path / "commands.db"
+    logger = SQLiteMessageLogger(database)
+    timestamp = datetime(2026, 11, 22, 16, 30, tzinfo=UTC)
+    command = SignalCommand(
+        command_id="command-1",
+        signal_id="signal-1",
+        phase=2,
+        hold_s=15.0,
+        reason="queue_pressure",
+        ts_utc=timestamp,
+    )
+    applied = ControllerAck(
+        command_id="command-1",
+        signal_id="signal-1",
+        phase=2,
+        hold_s=15.0,
+        applied=True,
+        reason="phase applied",
+        ts_utc=timestamp,
+    )
+
+    command_id = logger.log_command(command)
+    ack_id = logger.log_acknowledgement(applied)
+    duplicate_ack_id = logger.log_acknowledgement(applied)
+
+    with sqlite3.connect(database) as connection:
+        command_row = connection.execute(
+            """
+            SELECT command_id, signal_id, phase, hold_s
+            FROM published_commands WHERE id = ?
+            """,
+            (command_id,),
+        ).fetchone()
+        ack_row = connection.execute(
+            """
+            SELECT command_id, applied, reason
+            FROM received_acknowledgments WHERE id = ?
+            """,
+            (ack_id,),
+        ).fetchone()
+        ack_count = connection.execute(
+            "SELECT COUNT(*) FROM received_acknowledgments"
+        ).fetchone()[0]
+
+    logger.close()
+    assert command_row == ("command-1", "signal-1", 2, 15.0)
+    assert ack_row == ("command-1", 1, "phase applied")
+    assert ack_id == duplicate_ack_id
+    assert ack_count == 1
+
+
+def test_rejected_acknowledgement_is_stored_separately(tmp_path) -> None:
+    database = tmp_path / "rejected.db"
+    logger = SQLiteMessageLogger(database)
+    timestamp = datetime(2026, 11, 22, 16, 30, tzinfo=UTC)
+    rejected = ControllerAck(
+        command_id="command-rejected",
+        signal_id="signal-1",
+        phase=1,
+        hold_s=10.0,
+        applied=False,
+        reason="invalid phase",
+        ts_utc=timestamp,
+    )
+
+    record_id = logger.log_acknowledgement(rejected)
+
+    with sqlite3.connect(database) as connection:
+        row = connection.execute(
+            """
+            SELECT command_id, applied, reason
+            FROM received_acknowledgments WHERE id = ?
+            """,
+            (record_id,),
+        ).fetchone()
+
+    logger.close()
+    assert row == ("command-rejected", 0, "invalid phase")

@@ -1,6 +1,7 @@
 import asyncio
 import os
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,7 @@ from .in_memory_state import InMemoryTrafficState
 from .latency import LatencyHistogram
 from .message_handler import MQTTMessageHandler
 from .mqtt_subscriber import MQTTSubscriber
+from .orchestrator import BackendOrchestrator
 from .sqlite_logger import SQLiteMessageLogger
 from .websocket_manager import WebSocketManager
 
@@ -29,6 +31,8 @@ mqtt_subscriber = MQTTSubscriber(
 acknowledgement_bus = CommandBus(
     MQTTCommandPublisher(mqtt_subscriber.client),
     timeout_s=float(os.getenv("VYRO_COMMAND_ACK_TIMEOUT_S", "2")),
+    command_logger=sqlite_message_logger.log_command_async,
+    ack_logger=sqlite_message_logger.log_acknowledgement_async,
 )
 mqtt_message_handler = MQTTMessageHandler(
     websocket_manager,
@@ -37,6 +41,11 @@ mqtt_message_handler = MQTTMessageHandler(
     AcknowledgementHandler(acknowledgement_bus),
 )
 mqtt_subscriber._on_message = mqtt_message_handler
+orchestrator = BackendOrchestrator(
+    traffic_state,
+    acknowledgement_bus,
+    interval_s=float(os.getenv("VYRO_ORCHESTRATOR_INTERVAL_S", "1")),
+)
 
 
 @asynccontextmanager
@@ -49,6 +58,7 @@ async def lifespan(app: FastAPI):
     finally:
         mqtt_message_handler.deactivate()
         await asyncio.to_thread(mqtt_subscriber.stop)
+        orchestrator.stop()
         await asyncio.to_thread(sqlite_message_logger.close)
 
 
@@ -65,6 +75,7 @@ app.add_middleware(
 class ScenarioRequest(BaseModel):
     name: str = Field(default="normal", min_length=1, max_length=64)
     action: str = Field(default="start", pattern="^(start|stop|reset)$")
+    policy: Literal["fixed", "vyro"] = "fixed"
 
 
 @app.get("/health")
@@ -90,9 +101,16 @@ async def scenario(request: ScenarioRequest) -> dict[str, object]:
     status = "stopped"
     if request.action == "start":
         status = "running"
+        if request.policy == "vyro":
+            orchestrator.start()
+        else:
+            orchestrator.stop()
     elif request.action == "reset":
         status = "stopped"
-    traffic_state.set_scenario(request.name, status)
+        orchestrator.stop()
+    elif request.action == "stop":
+        orchestrator.stop()
+    traffic_state.set_scenario(request.name, status, request.policy)
     return traffic_state.snapshot()["scenario"]
 
 
