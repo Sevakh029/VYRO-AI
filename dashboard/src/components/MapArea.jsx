@@ -1,10 +1,61 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { CircleMarker, GeoJSON, MapContainer, Popup, TileLayer } from 'react-leaflet'
+import { SignalMarker } from './SignalMarker'
+import { getSignalId } from './signalId'
+import { generateMockIntersectionStates } from '../mockSignals'
 
 const CENTER = [40.20408, 44.49249]
+let clockNow = Date.now()
+let clockTimer
+const clockSubscribers = new Set()
 
-function MapArea({ vehicles }) {
+function getClockSnapshot() {
+  return clockNow
+}
+
+function subscribeToClock(subscriber) {
+  clockSubscribers.add(subscriber)
+  if (clockSubscribers.size === 1) {
+    clockNow = Date.now()
+    clockTimer = window.setInterval(() => {
+      clockNow = Date.now()
+      clockSubscribers.forEach((notify) => notify())
+    }, 1000)
+    subscriber()
+  }
+
+  return () => {
+    clockSubscribers.delete(subscriber)
+    if (clockSubscribers.size === 0) {
+      window.clearInterval(clockTimer)
+      clockTimer = undefined
+    }
+  }
+}
+
+function isSignalFeature(feature) {
+  const coordinates = feature?.geometry?.coordinates
+  return (
+    feature?.properties?.kind === 'signal' &&
+    feature.geometry?.type === 'Point' &&
+    Array.isArray(coordinates) &&
+    Number.isFinite(coordinates[0]) &&
+    Number.isFinite(coordinates[1])
+  )
+}
+
+function MapArea({
+  vehicles = [],
+  intersectionsById = {},
+  useMockSignals = false,
+  onMockMessage,
+}) {
   const [network, setNetwork] = useState(null)
+  const now = useSyncExternalStore(
+    subscribeToClock,
+    getClockSnapshot,
+    getClockSnapshot,
+  )
 
   useEffect(() => {
     let active = true
@@ -25,7 +76,10 @@ function MapArea({ vehicles }) {
     }
   }, [])
 
-  const features = network?.features ?? []
+  const features = useMemo(
+    () => (Array.isArray(network?.features) ? network.features : []),
+    [network],
+  )
   const roads = useMemo(
     () => ({
       type: 'FeatureCollection',
@@ -34,9 +88,28 @@ function MapArea({ vehicles }) {
     [features],
   )
   const signals = useMemo(
-    () => features.filter((feature) => feature.properties?.kind === 'signal'),
+    () => features.filter(isSignalFeature),
     [features],
   )
+  const signalIds = useMemo(
+    () => signals.map((feature, index) => getSignalId(feature, index)),
+    [signals],
+  )
+
+  useEffect(() => {
+    if (!useMockSignals || !onMockMessage || signalIds.length === 0) return
+
+    let tick = 0
+    const emit = () => {
+      const messages = generateMockIntersectionStates(signalIds, tick, Date.now())
+      tick += 1
+      messages.forEach(onMockMessage)
+    }
+
+    emit()
+    const timer = window.setInterval(emit, 1000)
+    return () => window.clearInterval(timer)
+  }, [onMockMessage, signalIds, useMockSignals])
 
   return (
     <section className="card map-card" aria-labelledby="map-heading">
@@ -56,19 +129,15 @@ function MapArea({ vehicles }) {
               style={{ color: '#3ecfb8', weight: 5, opacity: 0.8 }}
             />
           )}
-          {signals.map((feature, index) => {
-            const [longitude, latitude] = feature.geometry.coordinates
-            return (
-              <CircleMarker
-                key={feature.properties?.name ?? `signal-${index}`}
-                center={[latitude, longitude]}
-                radius={7}
-                pathOptions={{ color: '#f0b429', fillOpacity: 1 }}
-              >
-                <Popup>{feature.properties?.name ?? 'Traffic signal (sample)'}</Popup>
-              </CircleMarker>
-            )
-          })}
+          {signals.map((feature, index) => (
+            <SignalMarker
+              key={getSignalId(feature, index)}
+              feature={feature}
+              index={index}
+              intersectionsById={intersectionsById}
+              now={now}
+            />
+          ))}
           {vehicles.map((vehicle) => (
             <CircleMarker
               key={vehicle.vehicle_id}

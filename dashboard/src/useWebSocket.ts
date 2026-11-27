@@ -1,22 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import {
-  messageKey,
-  parseTopicMessage,
-  pruneStaleVehicleStates,
-  type TopicMessageStore,
-} from "./types";
+  createInitialDashboardStore,
+  dashboardStoreReducer,
+} from "./store";
 
 export function useWebSocket(url: string) {
   const socketRef = useRef<WebSocket | null>(null);
-  const [status, setStatus] = useState("Connecting");
-  const [messages, setMessages] = useState<TopicMessageStore>({});
+  const [store, dispatch] = useReducer(
+    dashboardStoreReducer,
+    undefined,
+    createInitialDashboardStore,
+  );
+  const ingestMockMessage = useCallback(
+    (value: unknown) =>
+      dispatch({ type: "message", value, receivedAt: Date.now(), source: "mock" }),
+    [dispatch],
+  );
 
   useEffect(() => {
+    dispatch({ type: "status", status: "connecting" });
     let stopped = false;
     let attempt = 0;
     let timer: number | undefined;
     const pruneTimer = window.setInterval(() => {
-      setMessages((current) => pruneStaleVehicleStates(current));
+      dispatch({ type: "prune", now: Date.now() });
     }, 1000);
 
     const connect = () => {
@@ -25,31 +32,19 @@ export function useWebSocket(url: string) {
       socketRef.current = socket;
       socket.onopen = () => {
         attempt = 0;
-        setStatus("Live");
+        dispatch({ type: "status", status: "open" });
       };
       socket.onmessage = (event) => {
         try {
           const value: unknown = JSON.parse(event.data);
-          const message = parseTopicMessage(value);
-          if (!message) {
-            setStatus("Invalid message");
-            return;
-          }
-          const key = messageKey(message);
-          setMessages((current) => ({
-            ...current,
-            [message.topic]: {
-              ...current[message.topic],
-              [key]: message,
-            },
-          }));
+          dispatch({ type: "message", value, receivedAt: Date.now() });
         } catch {
-          setStatus("Invalid message");
+          dispatch({ type: "dropped-message" });
         }
       };
       socket.onclose = () => {
         if (stopped) return;
-        setStatus("Disconnected");
+        dispatch({ type: "reconnecting" });
         const delay = Math.min(1000 * 2 ** attempt, 30000);
         attempt += 1;
         timer = window.setTimeout(connect, delay);
@@ -59,11 +54,12 @@ export function useWebSocket(url: string) {
     connect();
     return () => {
       stopped = true;
-      if (timer) window.clearTimeout(timer);
+      dispatch({ type: "status", status: "closed" });
+      if (timer !== undefined) window.clearTimeout(timer);
       window.clearInterval(pruneTimer);
       socketRef.current?.close();
     };
   }, [url]);
 
-  return { status, messages };
+  return { status: store.status, store, ingestMockMessage };
 }
