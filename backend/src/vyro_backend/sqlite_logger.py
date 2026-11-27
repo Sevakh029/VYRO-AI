@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 
-from .timestamps import utc_now
 from .schemas import ControllerAck, SignalCommand
+from .timestamps import utc_now
 
 logger = logging.getLogger(__name__)
 

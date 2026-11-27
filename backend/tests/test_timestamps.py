@@ -1,7 +1,6 @@
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-
 from vyro_backend.timestamps import normalize_utc, utc_now
 
 
@@ -13,7 +12,7 @@ def test_utc_now_is_timezone_aware_and_utc() -> None:
 
 
 def test_normalize_utc_converts_offset_timestamp_to_utc() -> None:
-    timestamp = datetime(2026, 11, 24, 12, tzinfo=timezone.utc)
+    timestamp = datetime(2026, 11, 24, 12, tzinfo=UTC)
 
     assert normalize_utc(timestamp) == timestamp
 
