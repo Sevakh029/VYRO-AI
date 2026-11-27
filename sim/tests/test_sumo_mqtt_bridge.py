@@ -305,10 +305,11 @@ def test_bridge_rejects_invalid_phase_without_changing_traci(tmp_path: Path) -> 
     traci = FakePhaseTraCI()
     traci.trafficlight.phase = 1
     command = SignalCommand(
-        intersection_id="signal-1",
-        phase_id=99,
+        signal_id="signal-1",
+        phase=99,
+        hold_s=15.0,
         reason="pressure",
-        timestamp=datetime(2026, 11, 24, 12, tzinfo=UTC),
+        ts_utc=datetime(2026, 11, 24, 12, tzinfo=UTC),
         command_id="command-1",
     )
 
@@ -339,10 +340,12 @@ def test_bridge_applies_valid_phase(tmp_path: Path) -> None:
     )
     traci = FakePhaseTraCI()
     command = {
-        "intersection_id": "signal-1",
-        "phase_id": 1,
+        "command_id": "command-1",
+        "signal_id": "signal-1",
+        "phase": 1,
+        "hold_s": 15.0,
         "reason": "pressure",
-        "timestamp": "2026-11-24T12:00:00Z",
+        "ts_utc": "2026-11-24T12:00:00Z",
     }
 
     result = bridge.apply_phase_command(traci, command)
@@ -380,10 +383,11 @@ def test_bridge_processes_mqtt_phase_commands_and_publishes_ack(
     bridge.set_traci(traci)
     bridge.on_connect(client, None, None, FakeReasonCode(False), None)  # type: ignore[arg-type]
     command = SignalCommand(
-        intersection_id="signal-1",
-        phase_id=phase_id,
+        signal_id="signal-1",
+        phase=phase_id,
+        hold_s=15.0,
         reason="queue_pressure",
-        timestamp=datetime(2026, 11, 24, 12, tzinfo=UTC),
+        ts_utc=datetime(2026, 11, 24, 12, tzinfo=UTC),
         command_id="command-1",
     )
     bridge.on_message(
@@ -404,5 +408,8 @@ def test_bridge_processes_mqtt_phase_commands_and_publishes_ack(
     assert topic == ACK_TOPIC
     assert qos == 1
     assert ack.command_id == "command-1"
+    assert ack.signal_id == "signal-1"
+    assert ack.phase == phase_id
+    assert ack.hold_s == 15.0
     assert ack.applied is expected_applied
     assert expected_reason in ack.reason

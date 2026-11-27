@@ -202,10 +202,10 @@ class SumoMqttBridge:
                 "applied": False,
                 "reason": "invalid command",
                 "command_id": "",
-                "intersection_id": "",
+                "signal_id": "",
             }
 
-        signal_id = command.intersection_id
+        signal_id = command.signal_id
         valid_indices = self.signals.get(signal_id)
         if valid_indices is None:
             return self._publish_rejection(
@@ -213,14 +213,14 @@ class SumoMqttBridge:
                 f"unknown signal: {signal_id}",
                 timestamp,
             )
-        if command.phase_id not in valid_indices:
+        if command.phase not in valid_indices:
             return self._publish_rejection(
                 command,
-                f"invalid phase index {command.phase_id} for signal {signal_id}",
+                f"invalid phase index {command.phase} for signal {signal_id}",
                 timestamp,
             )
 
-        traci.trafficlight.setPhase(signal_id, command.phase_id)
+        traci.trafficlight.setPhase(signal_id, command.phase)
         return self._publish_ack(
             command,
             True,
@@ -243,20 +243,23 @@ class SumoMqttBridge:
         reason: str,
         timestamp: datetime | None,
     ) -> dict[str, Any]:
-        command_id = command.command_id or f"bridge-{command.timestamp.isoformat()}"
+        command_id = command.command_id
         ack = ControllerAck(
             command_id=command_id,
-            intersection_id=command.intersection_id,
+            signal_id=command.signal_id,
+            phase=command.phase,
+            hold_s=command.hold_s,
             applied=applied,
             reason=reason,
-            timestamp=timestamp or utc_now(),
+            ts_utc=timestamp or utc_now(),
         )
         if self.connected:
             self.client.publish(ACK_TOPIC, ack.model_dump_json(), qos=1)
         return {
             "command_id": command_id,
-            "intersection_id": command.intersection_id,
-            "phase_id": command.phase_id,
+            "signal_id": command.signal_id,
+            "phase": command.phase,
+            "hold_s": command.hold_s,
             "applied": applied,
             "reason": reason,
         }
