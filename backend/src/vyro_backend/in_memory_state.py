@@ -8,6 +8,7 @@ from .schemas import IntersectionState, SignalCommand, VehicleState
 class ScenarioState(BaseModel):
     name: str = "normal"
     status: str = "stopped"
+    policy: str = "fixed"
 
 
 class InMemoryTrafficState:
@@ -30,9 +31,13 @@ class InMemoryTrafficState:
         with self._lock:
             self._commands[message.signal_id] = message
 
-    def set_scenario(self, name: str, status: str) -> None:
+    def set_scenario(self, name: str, status: str, policy: str = "fixed") -> None:
         with self._lock:
-            self._scenario = ScenarioState(name=name, status=status)
+            self._scenario = ScenarioState(name=name, status=status, policy=policy)
+
+    def latest_intersections(self) -> dict[str, IntersectionState]:
+        with self._lock:
+            return dict(self._intersections)
 
     def snapshot(self) -> dict[str, object]:
         with self._lock:

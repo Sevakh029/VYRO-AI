@@ -42,4 +42,8 @@ def test_in_memory_state_keeps_latest_entities_and_scenario() -> None:
     assert "vehicle-1" in snapshot["vehicles"]
     assert "intersection-1" in snapshot["intersections"]
     assert "signal-1" in snapshot["commands"]
-    assert snapshot["scenario"] == {"name": "normal", "status": "running"}
+    assert snapshot["scenario"] == {
+        "name": "normal",
+        "status": "running",
+        "policy": "fixed",
+    }

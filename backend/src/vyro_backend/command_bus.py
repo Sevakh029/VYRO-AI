@@ -41,6 +41,8 @@ class CommandBus:
         self,
         publisher: Callable[[SignalCommand], object],
         timeout_s: float = 2.0,
+        command_logger: Callable[[SignalCommand], object] | None = None,
+        ack_logger: Callable[[ControllerAck], object] | None = None,
     ) -> None:
         if timeout_s <= 0:
             raise ValueError("timeout_s must be positive")
@@ -54,6 +56,8 @@ class CommandBus:
         self.latency_samples_s: list[float] = []
         self._published_at: dict[str, float] = {}
         self.statuses: dict[str, dict[str, object]] = {}
+        self.command_logger = command_logger
+        self.ack_logger = ack_logger
 
     def publish(
         self,
@@ -95,6 +99,11 @@ class CommandBus:
                 }
             logger.error("Command %s publication failed: %s", command.command_id, exc)
             raise
+        if self.command_logger is not None:
+            try:
+                self.command_logger(command)
+            except Exception:
+                logger.exception("Failed to log published command %s", command.command_id)
         return command
 
     def publish_batch(self, commands: list[dict[str, object]]) -> list[SignalCommand]:
@@ -111,6 +120,11 @@ class CommandBus:
         return published
 
     def acknowledge(self, ack: ControllerAck) -> bool:
+        if self.ack_logger is not None:
+            try:
+                self.ack_logger(ack)
+            except Exception:
+                logger.exception("Failed to log acknowledgment %s", ack.command_id)
         with self._lock:
             command = self.pending.pop(ack.command_id, None)
             timer = self._timers.pop(ack.command_id, None)
@@ -138,7 +152,11 @@ class CommandBus:
                 "reason": "acknowledgment fields do not match the command",
                 "ack": ack.model_dump(mode="json"),
             }
-            logger.error("Acknowledgment %s does not match command %s", ack.command_id, command.command_id)
+            logger.error(
+                "Acknowledgment %s does not match command %s",
+                ack.command_id,
+                command.command_id,
+            )
             return False
         status = "applied" if ack.applied else "rejected"
         self.statuses[ack.command_id] = {

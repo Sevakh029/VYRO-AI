@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 
+from .schemas import ControllerAck, SignalCommand
+
 logger = logging.getLogger(__name__)
 
 
@@ -80,6 +82,43 @@ class SQLiteMessageLogger:
                         ON received_messages(received_at)
                         """
                     )
+                    connection.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS published_commands (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            command_id TEXT NOT NULL UNIQUE,
+                            signal_id TEXT NOT NULL,
+                            phase INTEGER NOT NULL,
+                            hold_s REAL NOT NULL,
+                            reason TEXT NOT NULL,
+                            ts_utc TEXT NOT NULL,
+                            published_at TEXT NOT NULL,
+                            schema_version TEXT NOT NULL,
+                            payload BLOB NOT NULL
+                        )
+                        """
+                    )
+                    connection.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS received_acknowledgments (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            command_id TEXT NOT NULL,
+                            signal_id TEXT NOT NULL,
+                            phase INTEGER NOT NULL,
+                            hold_s REAL NOT NULL,
+                            applied INTEGER NOT NULL,
+                            reason TEXT NOT NULL,
+                            ts_utc TEXT NOT NULL,
+                            received_at TEXT NOT NULL,
+                            schema_version TEXT NOT NULL,
+                            payload BLOB NOT NULL,
+                            UNIQUE (
+                                command_id, ts_utc, applied, reason,
+                                signal_id, phase, hold_s
+                            )
+                        )
+                        """
+                    )
                 self._initialized = True
                 self.last_error = None
             except sqlite3.Error as exc:
@@ -137,6 +176,109 @@ class SQLiteMessageLogger:
             self.last_error = str(exc)
             logger.exception("Failed to persist MQTT message from topic %s", topic)
             raise
+
+    def log_command(self, command: SignalCommand) -> int:
+        self.initialize()
+        published_at = datetime.now(UTC)
+        payload = command.model_dump_json().encode("utf-8")
+        try:
+            with sqlite3.connect(self.database_path) as connection:
+                connection.execute("PRAGMA busy_timeout = 5000")
+                cursor = connection.execute(
+                    """
+                    INSERT OR IGNORE INTO published_commands
+                        (command_id, signal_id, phase, hold_s, reason, ts_utc,
+                         published_at, schema_version, payload)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        command.command_id,
+                        command.signal_id,
+                        command.phase,
+                        command.hold_s,
+                        command.reason,
+                        command.ts_utc.astimezone(UTC).isoformat(),
+                        published_at.isoformat(),
+                        command.schema_version,
+                        sqlite3.Binary(payload),
+                    ),
+                )
+                del cursor
+                row = connection.execute(
+                    "SELECT id FROM published_commands WHERE command_id = ?",
+                    (command.command_id,),
+                ).fetchone()
+                if row is None:
+                    raise RuntimeError("SQLite did not persist published command")
+                return int(row[0])
+        except sqlite3.Error as exc:
+            self.last_error = str(exc)
+            logger.exception("Failed to persist published command %s", command.command_id)
+            raise
+
+    def log_acknowledgement(self, ack: ControllerAck) -> int:
+        self.initialize()
+        received_at = datetime.now(UTC)
+        payload = ack.model_dump_json().encode("utf-8")
+        try:
+            with sqlite3.connect(self.database_path) as connection:
+                connection.execute("PRAGMA busy_timeout = 5000")
+                cursor = connection.execute(
+                    """
+                    INSERT OR IGNORE INTO received_acknowledgments
+                        (command_id, signal_id, phase, hold_s, applied, reason,
+                         ts_utc, received_at, schema_version, payload)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        ack.command_id,
+                        ack.signal_id,
+                        ack.phase,
+                        ack.hold_s,
+                        int(ack.applied),
+                        ack.reason,
+                        ack.ts_utc.astimezone(UTC).isoformat(),
+                        received_at.isoformat(),
+                        ack.schema_version,
+                        sqlite3.Binary(payload),
+                    ),
+                )
+                del cursor
+                row = connection.execute(
+                    "SELECT id FROM received_acknowledgments WHERE command_id = ?",
+                    (ack.command_id,),
+                ).fetchone()
+                if row is None:
+                    raise RuntimeError("SQLite did not persist acknowledgment")
+                return int(row[0])
+        except sqlite3.Error as exc:
+            self.last_error = str(exc)
+            logger.exception("Failed to persist acknowledgment %s", ack.command_id)
+            raise
+
+    def log_command_async(self, command: SignalCommand) -> Future[int]:
+        if self._closed:
+            self._reopen()
+        future = self._executor.submit(self.log_command, command)
+        future.add_done_callback(
+            lambda completed: self._report_async_failure(
+                "vyro/v1/controller/command",
+                completed,
+            )
+        )
+        return future
+
+    def log_acknowledgement_async(self, ack: ControllerAck) -> Future[int]:
+        if self._closed:
+            self._reopen()
+        future = self._executor.submit(self.log_acknowledgement, ack)
+        future.add_done_callback(
+            lambda completed: self._report_async_failure(
+                "vyro/v1/controller/ack",
+                completed,
+            )
+        )
+        return future
 
     def log_async(
         self,
