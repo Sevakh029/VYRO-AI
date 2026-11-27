@@ -3,7 +3,7 @@ import logging
 import os
 import random
 import time
-from datetime import UTC, datetime
+from datetime import datetime
 from threading import Event
 
 import paho.mqtt.client as mqtt
@@ -14,6 +14,7 @@ from paho.mqtt.reasoncodes import ReasonCode
 
 from .publish_path import PublishPath
 from .schemas import VehicleState
+from .timestamps import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ class FakeVehicleGenerator:
         self.publish_path.close()
 
     def generate_states(self, timestamp: datetime | None = None) -> tuple[VehicleState, ...]:
-        current_timestamp = timestamp or datetime.now(UTC)
+        current_timestamp = timestamp or utc_now()
         movement_offset = (self._tick % 10_000) * 0.000001
         self._tick += 1
         return tuple(
@@ -177,6 +178,7 @@ def main() -> None:
         delay_seconds=args.delay_seconds,
         jitter_seconds=args.jitter_seconds,
         drop_probability=args.drop_probability,
+        seed=args.seed,
     )
     generator = FakeVehicleGenerator(
         host=args.host,

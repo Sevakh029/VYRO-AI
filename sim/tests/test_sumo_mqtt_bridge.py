@@ -2,9 +2,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from vyro_backend.schemas import VehicleState
+from vyro_backend.schemas import ControllerAck, SignalCommand, VehicleState
 
-from sim.sumo_mqtt_bridge import NetworkProjection, SumoMqttBridge, load_network
+from sim.sumo_mqtt_bridge import (
+    ACK_TOPIC,
+    NetworkProjection,
+    SumoMqttBridge,
+    load_network,
+)
 
 
 class FakePublishResult:
@@ -41,6 +46,25 @@ class FakeVehicleAPI:
 
 class FakeTraCI:
     vehicle = FakeVehicleAPI()
+
+
+class FakeTrafficLightAPI:
+    def __init__(self) -> None:
+        self.phase = 0
+        self.calls: list[tuple[str, int]] = []
+
+    def getPhase(self, signal_id: str) -> int:
+        del signal_id
+        return self.phase
+
+    def setPhase(self, signal_id: str, phase_id: int) -> None:
+        self.calls.append((signal_id, phase_id))
+        self.phase = phase_id
+
+
+class FakePhaseTraCI:
+    def __init__(self) -> None:
+        self.trafficlight = FakeTrafficLightAPI()
 
 
 class FakeReasonCode:
@@ -174,3 +198,65 @@ def test_bridge_counts_only_successful_mqtt_publish_results() -> None:
 
     assert bridge.publish_positions(FakeTraCI()) == 0
     assert len(client.published) == 1
+
+
+def test_bridge_rejects_invalid_phase_without_changing_traci(tmp_path: Path) -> None:
+    signals_file = tmp_path / "signals.json"
+    signals_file.write_text(
+        '[{"signal_id":"signal-1","valid_phase_indices":[0,1]}]',
+        encoding="utf-8",
+    )
+    client = FakeMQTTClient()
+    bridge = SumoMqttBridge(
+        NetworkProjection(lambda x, y: (44.492, 40.206)),
+        client,  # type: ignore[arg-type]
+        signals_file=signals_file,
+    )
+    bridge.connected = True
+    traci = FakePhaseTraCI()
+    traci.trafficlight.phase = 1
+    command = SignalCommand(
+        intersection_id="signal-1",
+        phase_id=99,
+        reason="pressure",
+        timestamp=datetime(2026, 11, 24, 12, tzinfo=UTC),
+        command_id="command-1",
+    )
+
+    result = bridge.apply_phase_command(traci, command)
+
+    assert traci.trafficlight.calls == []
+    assert traci.trafficlight.getPhase("signal-1") == 1
+    assert result["applied"] is False
+    assert "invalid phase index 99" in result["reason"]
+    topic, payload, qos = client.published[-1]
+    ack = ControllerAck.model_validate_json(payload)
+    assert topic == ACK_TOPIC
+    assert qos == 1
+    assert ack.applied is False
+    assert ack.command_id == "command-1"
+
+
+def test_bridge_applies_valid_phase(tmp_path: Path) -> None:
+    signals_file = tmp_path / "signals.json"
+    signals_file.write_text(
+        '[{"signal_id":"signal-1","valid_phase_indices":[0,1]}]',
+        encoding="utf-8",
+    )
+    bridge = SumoMqttBridge(
+        NetworkProjection(lambda x, y: (44.492, 40.206)),
+        FakeMQTTClient(),  # type: ignore[arg-type]
+        signals_file=signals_file,
+    )
+    traci = FakePhaseTraCI()
+    command = {
+        "intersection_id": "signal-1",
+        "phase_id": 1,
+        "reason": "pressure",
+        "timestamp": "2026-11-24T12:00:00Z",
+    }
+
+    result = bridge.apply_phase_command(traci, command)
+
+    assert result["applied"] is True
+    assert traci.trafficlight.calls == [("signal-1", 1)]
