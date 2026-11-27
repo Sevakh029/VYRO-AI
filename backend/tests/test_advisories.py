@@ -13,7 +13,7 @@ class FakePublisher:
         return "published"
 
 
-def test_advisory_publisher_uses_per_vehicle_topic() -> None:
+def test_advisory_publisher_uses_agreed_topic() -> None:
     publisher = FakePublisher()
     advisory = VehicleAdvisory(
         vehicle_id="vehicle-42",
@@ -25,6 +25,6 @@ def test_advisory_publisher_uses_per_vehicle_topic() -> None:
     result = AdvisoryPublisher(publisher).publish(advisory)
 
     assert result == "published"
-    assert advisory_topic("vehicle-42") == "vyro/vehicle/vehicle-42/advisory"
-    assert publisher.calls[0][0] == "vyro/vehicle/vehicle-42/advisory"
+    assert advisory_topic("vehicle-42") == "vyro/v1/vehicle/advisory"
+    assert publisher.calls[0][0] == "vyro/v1/vehicle/advisory"
     assert publisher.calls[0][2] == 1

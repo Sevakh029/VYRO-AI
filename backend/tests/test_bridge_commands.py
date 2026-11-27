@@ -6,12 +6,12 @@ def test_bridge_command_subscriber_validates_and_logs_commands() -> None:
     subscriber = MQTTSubscriber()
     bridge = BridgeCommandSubscriber(subscriber)
     payload = (
-        b'{"intersection_id":"intersection-1","phase_id":2,'
-        b'"reason":"queue_pressure","timestamp":"2026-11-23T10:00:00Z"}'
+        b'{"command_id":"command-1","signal_id":"signal-1","phase":2,'
+        b'"hold_s":15.0,"reason":"queue_pressure","ts_utc":"2026-11-23T10:00:00Z"}'
     )
 
-    assert bridge.receive(COMMAND_TOPIC, payload) == "intersection-1"
-    assert "intersection-1" in bridge.commands
+    assert bridge.receive(COMMAND_TOPIC, payload) == "signal-1"
+    assert "signal-1" in bridge.commands
 
 
 def test_bridge_command_subscriber_rejects_malformed_commands() -> None:

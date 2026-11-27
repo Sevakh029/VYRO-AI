@@ -29,10 +29,10 @@ def state_to_intersection(state: SystemState) -> IntersectionState:
 
 def command_to_action(message: SignalCommand) -> Action:
     return Action(
-        intersection_id=message.intersection_id,
-        phase_id=message.phase_id,
+        intersection_id=message.signal_id,
+        phase_id=message.phase,
         reason=message.reason,
-        timestamp=message.timestamp,
+        timestamp=message.ts_utc,
         schema_version=message.schema_version,
         command_id=message.command_id,
     )
@@ -40,10 +40,11 @@ def command_to_action(message: SignalCommand) -> Action:
 
 def action_to_command(action: Action) -> SignalCommand:
     return SignalCommand(
-        intersection_id=action.intersection_id,
-        phase_id=action.phase_id,
+        command_id=action.command_id or "",
+        signal_id=action.intersection_id,
+        phase=action.phase_id,
+        hold_s=15.0,
         reason=action.reason,
-        timestamp=action.timestamp,
+        ts_utc=action.timestamp,
         schema_version=action.schema_version,
-        command_id=action.command_id,
     )

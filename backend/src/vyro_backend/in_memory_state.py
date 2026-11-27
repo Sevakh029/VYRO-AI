@@ -28,7 +28,7 @@ class InMemoryTrafficState:
 
     def receive_command(self, message: SignalCommand) -> None:
         with self._lock:
-            self._commands[message.intersection_id] = message
+            self._commands[message.signal_id] = message
 
     def set_scenario(self, name: str, status: str) -> None:
         with self._lock:

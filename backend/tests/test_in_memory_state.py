@@ -27,10 +27,12 @@ def test_in_memory_state_keeps_latest_entities_and_scenario() -> None:
     )
     state.receive_command(
         SignalCommand(
-            intersection_id="intersection-1",
-            phase_id=1,
+            command_id="command-1",
+            signal_id="signal-1",
+            phase=1,
+            hold_s=15.0,
             reason="queue_pressure",
-            timestamp=timestamp,
+            ts_utc=timestamp,
         )
     )
     state.set_scenario("normal", "running")
@@ -39,5 +41,5 @@ def test_in_memory_state_keeps_latest_entities_and_scenario() -> None:
 
     assert "vehicle-1" in snapshot["vehicles"]
     assert "intersection-1" in snapshot["intersections"]
-    assert "intersection-1" in snapshot["commands"]
+    assert "signal-1" in snapshot["commands"]
     assert snapshot["scenario"] == {"name": "normal", "status": "running"}

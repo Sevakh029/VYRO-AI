@@ -24,10 +24,10 @@ class BridgeCommandSubscriber:
         except ValidationError:
             logger.warning("Rejected invalid bridge command")
             return False
-        self.commands[command.intersection_id] = command
+        self.commands[command.signal_id] = command
         logger.info(
-            "Bridge received command for intersection %s, phase %d",
-            command.intersection_id,
-            command.phase_id,
+            "Bridge received command for signal %s, phase %d",
+            command.signal_id,
+            command.phase,
         )
-        return command.intersection_id
+        return command.signal_id

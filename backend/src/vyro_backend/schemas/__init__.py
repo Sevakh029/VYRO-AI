@@ -7,6 +7,7 @@ from .vehicle_advisory import VehicleAdvisory
 from .vehicle_state import VehicleState
 
 __all__ = [
+    "Ack",
     "IntersectionState",
     "ControllerAck",
     "MetricsSnapshot",
@@ -15,3 +16,5 @@ __all__ = [
     "VehicleAdvisory",
     "VehicleState",
 ]
+
+Ack = ControllerAck
