@@ -27,6 +27,8 @@ export interface DashboardStore {
   metrics: TrackedItem<MetricsSnapshot> | null;
   advisories: Record<string, TrackedItem<AuxiliaryTopicMessage>>;
   hasLiveIntersectionData: boolean;
+  hasLiveCommandData: boolean;
+  hasLiveMetricsData: boolean;
   status: WebSocketStatus;
   droppedMessages: number;
 }
@@ -51,6 +53,8 @@ export function createInitialDashboardStore(): DashboardStore {
     metrics: null,
     advisories: {},
     hasLiveIntersectionData: false,
+    hasLiveCommandData: false,
+    hasLiveMetricsData: false,
     status: "connecting",
     droppedMessages: 0,
   };
@@ -166,16 +170,26 @@ function updateMessage(
         },
       };
     case "vyro/v1/controller/command":
-    case "vyro/v1/controller/ack":
+    case "vyro/v1/controller/ack": {
+      const commandHistory =
+        source === "live"
+          ? store.commandHistory.filter((item) => item.source !== "mock")
+          : store.commandHistory;
       return {
         ...store,
+        hasLiveCommandData: store.hasLiveCommandData || source === "live",
         commandHistory: upsertCommand(
-          store.commandHistory,
+          commandHistory,
           tracked(message, lastUpdated, source),
         ),
       };
+    }
     case "vyro/v1/metrics/snapshot":
-      return { ...store, metrics: tracked(message, lastUpdated, source) };
+      return {
+        ...store,
+        metrics: tracked(message, lastUpdated, source),
+        hasLiveMetricsData: store.hasLiveMetricsData || source === "live",
+      };
     case "vyro/v1/vehicle/advisory": {
       const key =
         message.vehicle_id ??
@@ -229,12 +243,22 @@ export function dashboardStoreReducer(
       if (!message) {
         return { ...store, droppedMessages: store.droppedMessages + 1 };
       }
-      if (
-        source === "mock" &&
-        (message.topic !== "vyro/v1/intersection/state" ||
-          store.hasLiveIntersectionData)
-      ) {
-        return store;
+      if (source === "mock") {
+        if (
+          (message.topic === "vyro/v1/intersection/state" &&
+            store.hasLiveIntersectionData) ||
+          ((message.topic === "vyro/v1/controller/command" ||
+            message.topic === "vyro/v1/controller/ack") &&
+            store.hasLiveCommandData) ||
+          (message.topic === "vyro/v1/metrics/snapshot" &&
+            store.hasLiveMetricsData) ||
+          (message.topic !== "vyro/v1/intersection/state" &&
+            message.topic !== "vyro/v1/controller/command" &&
+            message.topic !== "vyro/v1/controller/ack" &&
+            message.topic !== "vyro/v1/metrics/snapshot")
+        ) {
+          return store;
+        }
       }
       return updateMessage(store, message, action.receivedAt, source);
     }

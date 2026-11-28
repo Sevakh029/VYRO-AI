@@ -71,11 +71,34 @@
   padding: 18px 18px 16px;
 }
 
+.kpi-card-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
 .kpi-label {
   color: var(--text-muted);
   font-size: 13px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.kpi-stale-badge {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(240, 180, 41, 0.14);
+  color: var(--idle);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kpi-value-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .kpi-value {
@@ -87,10 +110,21 @@
   line-height: 1.1;
 }
 
+.kpi-unit {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .kpi-detail {
   margin-top: 8px;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.kpi-context {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .dashboard-grid {
@@ -113,6 +147,115 @@
   margin-top: 4px;
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.command-ack-panel {
+  overflow: hidden;
+}
+
+.command-ack-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 16px 16px 12px;
+}
+
+.command-ack-header .panel-heading {
+  padding: 0;
+}
+
+.command-ack-filters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.command-ack-filters label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.command-ack-filters select {
+  min-width: 130px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.command-ack-filters input {
+  accent-color: var(--accent);
+}
+
+.command-ack-table-wrap {
+  overflow-x: auto;
+}
+
+.command-ack-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.command-ack-table th,
+.command-ack-table td {
+  padding: 11px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.command-ack-table th {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.command-ack-table td {
+  font-size: 14px;
+}
+
+.command-ack-table td:last-child {
+  white-space: normal;
+}
+
+.command-ack-table td:nth-child(1),
+.command-ack-table td:nth-child(2),
+.command-ack-table td:nth-child(4) {
+  font-family: var(--mono);
+}
+
+.command-status {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #223140;
+  text-transform: capitalize;
+}
+
+.command-status-applied {
+  color: var(--ok);
+}
+
+.command-status-rejected,
+.command-status-timeout {
+  color: var(--alert);
+}
+
+.command-status-pending {
+  color: var(--idle);
+}
+
+.command-ack-empty {
+  padding: 18px 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
 }
 
 .map {
@@ -344,6 +487,12 @@
 
   .header {
     align-items: flex-start;
+  }
+
+  .command-ack-header,
+  .command-ack-filters {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .map {

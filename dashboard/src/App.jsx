@@ -3,6 +3,7 @@ import Header from './components/Header'
 import KpiPanel from './components/KpiPanel'
 import MapArea from './components/MapArea'
 import NetworkActivity from './components/NetworkActivity'
+import { CommandAckPanel } from './components/CommandAckPanel'
 import { useWebSocket } from './useWebSocket'
 import './App.css'
 
@@ -25,36 +26,18 @@ function App() {
   const intersections = Object.values(store.intersections).map((item) => item.value)
   const alertCount =
     Object.keys(store.advisories).length + store.commandHistory.length + simulatedAlerts
-  const averageSpeed = vehicleList.length
-    ? vehicleList.reduce((sum, vehicle) => sum + (vehicle.speed_mps ?? 0), 0) / vehicleList.length
-    : 0
-
-  const metrics = [
-    {
-      id: 'vehicles',
-      label: 'Connected vehicles',
-      value: String(vehicleList.length),
-      detail: 'Received through the live MQTT bridge',
-    },
-    {
-      id: 'alerts',
-      label: 'Active alerts',
-      value: String(alertCount),
-      detail: 'Received advisories and controller alerts',
-    },
-    {
-      id: 'speed',
-      label: 'Average vehicle speed',
-      value: `${(averageSpeed * 3.6).toFixed(1)} km/h`,
-      detail: 'Live fleet average',
-    },
-  ]
-
   return (
     <div className="dashboard">
       <Header status={{ label: connectionStatus, tone: status === 'open' ? 'ok' : 'alert' }} />
       <main className="dashboard-main">
-        <KpiPanel metrics={metrics} />
+        <KpiPanel
+          store={store}
+          onMockMessage={ingestMockMessage}
+          useMockKpis={
+            import.meta.env.VITE_USE_MOCK_KPIS === 'true' &&
+            !store.hasLiveMetricsData
+          }
+        />
         <div className="dashboard-grid">
           <MapArea
             vehicles={vehicleList}
@@ -73,6 +56,14 @@ function App() {
             intersections={intersections}
           />
         </div>
+        <CommandAckPanel
+          history={store.commandHistory}
+          onMockMessage={ingestMockMessage}
+          useMockCommands={
+            import.meta.env.VITE_USE_MOCK_COMMANDS === 'true' &&
+            !store.hasLiveCommandData
+          }
+        />
       </main>
     </div>
   )

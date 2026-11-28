@@ -21,3 +21,23 @@ Set `VITE_USE_MOCK_SIGNALS=true` in the dashboard environment to generate
 IntersectionState updates for the network's signal IDs once per second. Mock
 updates stop and are removed from the store when the first live intersection
 message arrives. The generator is disabled by default.
+
+## Command / acknowledgement log
+
+The command log reads the existing WebSocket store and correlates canonical
+`SignalCommand` and `ControllerAck` messages by `command_id`. Commands without
+an acknowledgement become `timeout` after five seconds.
+
+Set `VITE_USE_MOCK_COMMANDS=true` in the dashboard environment to generate
+mock commands every two seconds, with acknowledgements delayed by about 300 ms.
+Some mock commands are rejected or intentionally receive no acknowledgement.
+Mock command generation is disabled and its entries are removed when the first
+live command or acknowledgement arrives. The generator is disabled by default.
+
+## Fleet KPI panel
+
+The KPI panel prefers the latest metrics snapshot, or computes vehicle count,
+mean speed, and stopped vehicles from the stored vehicle states until a live
+snapshot is available. Set `VITE_USE_MOCK_KPIS=true` to generate mock metrics
+snapshots once per second; generation stops when the first live snapshot arrives.
+The generator is disabled by default.

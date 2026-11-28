@@ -204,6 +204,64 @@ describe("dashboard store", () => {
     ).toHaveLength(1);
   });
 
+  it("removes command mocks and ignores later ones after a live command arrives", () => {
+    let store = dashboardStoreReducer(createInitialDashboardStore(), {
+      type: "message",
+      source: "mock",
+      value: command("mock-command"),
+      receivedAt,
+    });
+    store = dashboardStoreReducer(store, {
+      type: "message",
+      value: command("live-command"),
+      receivedAt: receivedAt + 1,
+    });
+    const afterLateMock = dashboardStoreReducer(store, {
+      type: "message",
+      source: "mock",
+      value: command("late-mock-command"),
+      receivedAt: receivedAt + 2,
+    });
+
+    expect(store.hasLiveCommandData).toBe(true);
+    expect(
+      store.commandHistory.map((item) => item.value.command_id),
+    ).toEqual(["live-command"]);
+    expect(afterLateMock.commandHistory).toBe(store.commandHistory);
+  });
+
+  it("ignores mock metrics after the first live snapshot arrives", () => {
+    const metrics = (vehicleCount: number) => ({
+      topic: "vyro/v1/metrics/snapshot",
+      schema_version: "0.2",
+      vehicle_count: vehicleCount,
+      mean_speed_mps: 8,
+      stopped_vehicle_count: 1,
+      timestamp: "2026-11-24T12:00:00Z",
+    });
+    let store = dashboardStoreReducer(createInitialDashboardStore(), {
+      type: "message",
+      source: "mock",
+      value: metrics(10),
+      receivedAt,
+    });
+    store = dashboardStoreReducer(store, {
+      type: "message",
+      value: metrics(20),
+      receivedAt: receivedAt + 1,
+    });
+    const afterLateMock = dashboardStoreReducer(store, {
+      type: "message",
+      source: "mock",
+      value: metrics(30),
+      receivedAt: receivedAt + 2,
+    });
+
+    expect(store.hasLiveMetricsData).toBe(true);
+    expect(store.metrics?.value.vehicle_count).toBe(20);
+    expect(afterLateMock.metrics).toBe(store.metrics);
+  });
+
   it("marks entries stale after the threshold using fake time", () => {
     vi.useFakeTimers();
     vi.setSystemTime(receivedAt);
