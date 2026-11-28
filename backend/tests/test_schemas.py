@@ -228,7 +228,11 @@ def test_schema_version_defaults_to_0_2_and_accepts_explicit_value() -> None:
 def test_schema_models_reject_naive_timestamps(model: type, example_name: str) -> None:
     example_path = Path(__file__).parents[2] / "schemas" / "examples" / example_name
     payload = json.loads(example_path.read_text(encoding="utf-8"))
-    timestamp_field = "ts_utc" if "signal_command" in example_name or "controller_ack" in example_name else "timestamp"
+    timestamp_field = (
+        "ts_utc"
+        if "signal_command" in example_name or "controller_ack" in example_name
+        else "timestamp"
+    )
     payload[timestamp_field] = "2026-11-24T10:00:00"
 
     with pytest.raises(ValidationError, match="timezone-aware UTC"):
