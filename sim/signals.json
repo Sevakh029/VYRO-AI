@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.2",
+  "signals": [
+    {
+      "signal_id": "11144080253",
+      "phases": [
+        {"phase": 0, "kind": "green", "minimum_green_s": 81.0, "yellow_s": 0.0, "all_red_s": 0.0},
+        {"phase": 1, "kind": "yellow", "minimum_green_s": 4.0, "yellow_s": 4.0, "all_red_s": 0.0},
+        {"phase": 2, "kind": "all_red", "minimum_green_s": 5.0, "yellow_s": 0.0, "all_red_s": 5.0}
+      ],
+      "yellow_phase": 1,
+      "all_red_phase": 2,
+      "max_wait_s": 120.0
+    },
+    {"signal_id": "11144080256", "phases": [{"phase": 0, "kind": "green", "minimum_green_s": 81.0, "yellow_s": 0.0, "all_red_s": 0.0}, {"phase": 1, "kind": "yellow", "minimum_green_s": 4.0, "yellow_s": 4.0, "all_red_s": 0.0}, {"phase": 2, "kind": "all_red", "minimum_green_s": 5.0, "yellow_s": 0.0, "all_red_s": 5.0}], "yellow_phase": 1, "all_red_phase": 2, "max_wait_s": 120.0},
+    {"signal_id": "11144080257", "phases": [{"phase": 0, "kind": "green", "minimum_green_s": 81.0, "yellow_s": 0.0, "all_red_s": 0.0}, {"phase": 1, "kind": "yellow", "minimum_green_s": 4.0, "yellow_s": 4.0, "all_red_s": 0.0}, {"phase": 2, "kind": "all_red", "minimum_green_s": 5.0, "yellow_s": 0.0, "all_red_s": 5.0}], "yellow_phase": 1, "all_red_phase": 2, "max_wait_s": 120.0},
+    {"signal_id": "11282037248", "phases": [{"phase": 0, "kind": "green", "minimum_green_s": 81.0, "yellow_s": 0.0, "all_red_s": 0.0}, {"phase": 1, "kind": "yellow", "minimum_green_s": 4.0, "yellow_s": 4.0, "all_red_s": 0.0}, {"phase": 2, "kind": "all_red", "minimum_green_s": 5.0, "yellow_s": 0.0, "all_red_s": 5.0}], "yellow_phase": 1, "all_red_phase": 2, "max_wait_s": 120.0},
+    {"signal_id": "12133698754", "phases": [{"phase": 0, "kind": "green", "minimum_green_s": 81.0, "yellow_s": 0.0, "all_red_s": 0.0}, {"phase": 1, "kind": "yellow", "minimum_green_s": 4.0, "yellow_s": 4.0, "all_red_s": 0.0}, {"phase": 2, "kind": "all_red", "minimum_green_s": 5.0, "yellow_s": 0.0, "all_red_s": 5.0}], "yellow_phase": 1, "all_red_phase": 2, "max_wait_s": 120.0},
+    {"signal_id": "12133698755", "phases": [{"phase": 0, "kind": "green", "minimum_green_s": 81.0, "yellow_s": 0.0, "all_red_s": 0.0}, {"phase": 1, "kind": "yellow", "minimum_green_s": 4.0, "yellow_s": 4.0, "all_red_s": 0.0}, {"phase": 2, "kind": "all_red", "minimum_green_s": 5.0, "yellow_s": 0.0, "all_red_s": 5.0}], "yellow_phase": 1, "all_red_phase": 2, "max_wait_s": 120.0},
+    {"signal_id": "12133698756", "phases": [{"phase": 0, "kind": "green", "minimum_green_s": 81.0, "yellow_s": 0.0, "all_red_s": 0.0}, {"phase": 1, "kind": "yellow", "minimum_green_s": 4.0, "yellow_s": 4.0, "all_red_s": 0.0}, {"phase": 2, "kind": "all_red", "minimum_green_s": 5.0, "yellow_s": 0.0, "all_red_s": 5.0}], "yellow_phase": 1, "all_red_phase": 2, "max_wait_s": 120.0},
+    {"signal_id": "12133698757", "phases": [{"phase": 0, "kind": "green", "minimum_green_s": 81.0, "yellow_s": 0.0, "all_red_s": 0.0}, {"phase": 1, "kind": "yellow", "minimum_green_s": 4.0, "yellow_s": 4.0, "all_red_s": 0.0}, {"phase": 2, "kind": "all_red", "minimum_green_s": 5.0, "yellow_s": 0.0, "all_red_s": 5.0}], "yellow_phase": 1, "all_red_phase": 2, "max_wait_s": 120.0},
+    {"signal_id": "3835488429", "phases": [{"phase": 0, "kind": "green", "minimum_green_s": 81.0, "yellow_s": 0.0, "all_red_s": 0.0}, {"phase": 1, "kind": "yellow", "minimum_green_s": 4.0, "yellow_s": 4.0, "all_red_s": 0.0}, {"phase": 2, "kind": "all_red", "minimum_green_s": 5.0, "yellow_s": 0.0, "all_red_s": 5.0}], "yellow_phase": 1, "all_red_phase": 2, "max_wait_s": 120.0}
+  ]
+}

@@ -43,6 +43,7 @@ class CommandBus:
         timeout_s: float = 2.0,
         command_logger: Callable[[SignalCommand], object] | None = None,
         ack_logger: Callable[[ControllerAck], object] | None = None,
+        status_callback: Callable[[dict[str, object]], object] | None = None,
     ) -> None:
         if timeout_s <= 0:
             raise ValueError("timeout_s must be positive")
@@ -58,6 +59,15 @@ class CommandBus:
         self.statuses: dict[str, dict[str, object]] = {}
         self.command_logger = command_logger
         self.ack_logger = ack_logger
+        self.status_callback = status_callback
+        self._seen_ack_ids: set[str] = set()
+
+    def _publish_status(self, status: dict[str, object]) -> None:
+        if self.status_callback is not None:
+            try:
+                self.status_callback(status)
+            except Exception:
+                logger.exception("Failed to publish acknowledgement status over WebSocket")
 
     def publish(
         self,
@@ -126,6 +136,17 @@ class CommandBus:
             except Exception:
                 logger.exception("Failed to log acknowledgment %s", ack.command_id)
         with self._lock:
+            if ack.command_id in self._seen_ack_ids:
+                status = {
+                    "status": "duplicate",
+                    "reason": "duplicate acknowledgement ignored",
+                    "ack": ack.model_dump(mode="json"),
+                    "topic": "vyro/v1/controller/ack",
+                }
+                self.statuses[ack.command_id] = status
+                logger.warning("Received duplicate acknowledgment %s", ack.command_id)
+                return False
+            self._seen_ack_ids.add(ack.command_id)
             command = self.pending.pop(ack.command_id, None)
             timer = self._timers.pop(ack.command_id, None)
             self.acks[ack.command_id] = ack
@@ -135,13 +156,27 @@ class CommandBus:
         if published_at is not None:
             self.latency_samples_s.append(time.monotonic() - published_at)
         if command is None:
+            prior_status = self.statuses.get(ack.command_id)
+            if prior_status is not None and prior_status.get("status") == "timeout":
+                status = "delayed_applied" if ack.applied else "delayed_rejected"
+                delayed_status = {
+                    "status": status,
+                    "reason": ack.reason,
+                    "ack": ack.model_dump(mode="json"),
+                    "topic": "vyro/v1/controller/ack",
+                }
+                self.statuses[ack.command_id] = delayed_status
+                logger.info("Received delayed acknowledgment %s", ack.command_id)
+                return ack.applied
             self.statuses[ack.command_id] = {
                 "status": "unknown",
                 "reason": "acknowledgment has no matching pending command",
                 "ack": ack.model_dump(mode="json"),
+                "topic": "vyro/v1/controller/ack",
             }
             logger.warning("Received unmatched acknowledgment %s", ack.command_id)
             return False
+        prior_status = self.statuses.get(ack.command_id)
         if (
             ack.signal_id != command.signal_id
             or ack.phase != command.phase
@@ -151,6 +186,7 @@ class CommandBus:
                 "status": "rejected",
                 "reason": "acknowledgment fields do not match the command",
                 "ack": ack.model_dump(mode="json"),
+                "topic": "vyro/v1/controller/ack",
             }
             logger.error(
                 "Acknowledgment %s does not match command %s",
@@ -159,10 +195,13 @@ class CommandBus:
             )
             return False
         status = "applied" if ack.applied else "rejected"
+        if prior_status is not None and prior_status.get("status") == "timeout":
+            status = "delayed_applied" if ack.applied else "delayed_rejected"
         self.statuses[ack.command_id] = {
             "status": status,
             "reason": ack.reason,
             "ack": ack.model_dump(mode="json"),
+            "topic": "vyro/v1/controller/ack",
         }
         logger.info(
             "Command %s status=%s for signal %s",
@@ -182,8 +221,10 @@ class CommandBus:
                     "status": "timeout",
                     "reason": "acknowledgment timeout",
                     "signal_id": command.signal_id,
+                    "topic": "vyro/v1/controller/ack",
                 }
         if command is not None:
+            self._publish_status(self.statuses[command_id])
             logger.warning(
                 "Command %s timed out; signal %s must revert to fixed time",
                 command_id,

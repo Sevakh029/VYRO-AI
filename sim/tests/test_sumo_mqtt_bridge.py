@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from vyro_backend.schemas import VehicleState
+from vyro_backend.schemas import ControllerAck, IntersectionState, SignalCommand, VehicleState
 
 from sim.sumo_mqtt_bridge import NetworkProjection, SumoMqttBridge, load_network
 
@@ -174,3 +174,117 @@ def test_bridge_counts_only_successful_mqtt_publish_results() -> None:
 
     assert bridge.publish_positions(FakeTraCI()) == 0
     assert len(client.published) == 1
+
+
+class FakeTrafficLightAPI:
+    def __init__(self) -> None:
+        self.applied: list[tuple[str, int]] = []
+        self.phases = {"signal-1": 0}
+
+    def getIDList(self) -> tuple[str, ...]:
+        return ("signal-1",)
+
+    def setPhase(self, signal_id: str, phase: int) -> None:
+        self.applied.append((signal_id, phase))
+        self.phases[signal_id] = phase
+
+    def getPhase(self, signal_id: str) -> int:
+        return self.phases[signal_id]
+
+    def setProgram(self, signal_id: str, program_id: str) -> None:
+        del signal_id, program_id
+
+    def getControlledLanes(self, signal_id: str) -> tuple[str, ...]:
+        del signal_id
+        return ("lane-1",)
+
+    def getSpentTime(self, signal_id: str) -> float:
+        del signal_id
+        return 12.0
+
+
+class FakeBridgeTraCI:
+    def __init__(self) -> None:
+        self.trafficlight = FakeTrafficLightAPI()
+        self.vehicle = FakeVehicleAPI()
+
+
+def test_bridge_applies_valid_command_and_publishes_ack(tmp_path) -> None:
+    config = tmp_path / "signals.json"
+    config.write_text(
+        '{"signals":[{"signal_id":"signal-1","phases":[{"phase":0,"kind":"green","minimum_green_s":20,"yellow_s":0,"all_red_s":0},{"phase":1,"kind":"yellow","minimum_green_s":4,"yellow_s":4,"all_red_s":0},{"phase":2,"kind":"all_red","minimum_green_s":5,"yellow_s":0,"all_red_s":5}],"yellow_phase":1,"all_red_phase":2,"max_wait_s":120}]}',
+        encoding="utf-8",
+    )
+    client = FakeMQTTClient()
+    bridge = SumoMqttBridge(
+        NetworkProjection(lambda x, y: (44.492, 40.206)),
+        client,
+        signals_file=config,
+    )
+    bridge.connected = True
+    traci = FakeBridgeTraCI()
+    bridge.attach_traci(traci)
+    command = SignalCommand(
+        command_id="command-1",
+        signal_id="signal-1",
+        phase=1,
+        hold_s=15,
+        reason="yellow",
+        ts_utc=datetime.now(UTC),
+    )
+
+    ack = bridge.apply_command(command)
+
+    assert traci.trafficlight.applied == [("signal-1", 1)]
+    assert ack.applied
+    assert ControllerAck.model_validate_json(client.published[-1][1]).command_id == "command-1"
+
+
+def test_bridge_rejects_unknown_signal_and_phase(tmp_path) -> None:
+    config = tmp_path / "signals.json"
+    config.write_text('{"signals":[]}', encoding="utf-8")
+    bridge = SumoMqttBridge(
+        NetworkProjection(lambda x, y: (44.492, 40.206)),
+        FakeMQTTClient(),
+        signals_file=config,
+    )
+    command = SignalCommand(
+        command_id="command-1",
+        signal_id="unknown",
+        phase=9,
+        hold_s=15,
+        reason="test",
+        ts_utc=datetime.now(UTC),
+    )
+    ack = bridge.apply_command(command)
+    assert not ack.applied
+    assert ack.reason == "unknown signal_id"
+
+
+def test_bridge_publishes_intersection_state(tmp_path) -> None:
+    config = tmp_path / "signals.json"
+    config.write_text('{"signals":[]}', encoding="utf-8")
+    client = FakeMQTTClient()
+    bridge = SumoMqttBridge(
+        NetworkProjection(lambda x, y: (44.492, 40.206)),
+        client,
+        signals_file=config,
+    )
+    bridge.connected = True
+
+    traci = FakeBridgeTraCI()
+    traci.vehicle = type(
+        "FakeVehicleLaneAPI",
+        (object,),
+        {
+            "getIDList": lambda self: ("vehicle-1",),
+            "getLaneID": lambda self, vehicle_id: "lane-1",
+        },
+    )()
+
+    assert bridge.publish_intersections(traci, datetime.now(UTC)) == 1
+    topic, payload, qos = client.published[-1]
+    assert topic == "vyro/v1/intersection/state"
+    assert qos == 1
+    state = IntersectionState.model_validate_json(payload)
+    assert state.intersection_id == "signal-1"

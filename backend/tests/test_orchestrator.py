@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from vyro_backend.in_memory_state import InMemoryTrafficState
 from vyro_backend.orchestrator import BackendOrchestrator
 from vyro_backend.schemas import IntersectionState
+from vyro_controller.safety import signal_safety_from_dict
 from vyro_controller.state import Action
 
 
@@ -21,6 +22,43 @@ class FakePublisher:
         return command
 
 
+def safety_configs(*signal_ids: str) -> dict:
+    result = {}
+    for signal_id in signal_ids or ("signal-1", "signal-2"):
+        result[signal_id] = signal_safety_from_dict(
+            {
+                "signal_id": signal_id,
+                "phases": [
+                    {
+                        "phase": 0,
+                        "kind": "green",
+                        "minimum_green_s": 5,
+                        "yellow_s": 0,
+                        "all_red_s": 0,
+                    },
+                    {
+                        "phase": 1,
+                        "kind": "yellow",
+                        "minimum_green_s": 4,
+                        "yellow_s": 4,
+                        "all_red_s": 0,
+                    },
+                    {
+                        "phase": 2,
+                        "kind": "all_red",
+                        "minimum_green_s": 5,
+                        "yellow_s": 0,
+                        "all_red_s": 5,
+                    },
+                ],
+                "yellow_phase": 1,
+                "all_red_phase": 2,
+                "max_wait_s": 120,
+            }
+        )
+    return result
+
+
 def add_intersection(state, timestamp=None):
     state.receive_intersection(
         IntersectionState(
@@ -36,7 +74,11 @@ def test_successful_tick_publishes_stub_action() -> None:
     state = InMemoryTrafficState()
     add_intersection(state)
     publisher = FakePublisher()
-    orchestrator = BackendOrchestrator(state, publisher)
+    orchestrator = BackendOrchestrator(
+        state,
+        publisher,
+        signal_configs=safety_configs("signal-1"),
+    )
 
     commands = orchestrator.tick_once()
 
@@ -84,6 +126,7 @@ def test_multiple_signal_actions_are_published() -> None:
     orchestrator = BackendOrchestrator(
         state,
         publisher,
+        signal_configs=safety_configs("signal-1", "signal-2"),
         controller=lambda system_state: [
             Action(
                 intersection_id=system_state.intersection_id,
@@ -123,3 +166,63 @@ def test_command_publication_failure_does_not_raise() -> None:
 
     orchestrator = BackendOrchestrator(state, BrokenPublisher())
     assert orchestrator.tick() == []
+
+
+def test_orchestrator_rejects_action_not_in_trusted_config(tmp_path) -> None:
+    config = tmp_path / "signals.json"
+    config.write_text(
+        '{"signals":[{"signal_id":"signal-1","phases":[{"phase":0,"kind":"green","minimum_green_s":20,"yellow_s":0,"all_red_s":0},{"phase":1,"kind":"yellow","minimum_green_s":4,"yellow_s":4,"all_red_s":0},{"phase":2,"kind":"all_red","minimum_green_s":5,"yellow_s":0,"all_red_s":5}],"yellow_phase":1,"all_red_phase":2,"max_wait_s":120}]}',
+        encoding="utf-8",
+    )
+    state = InMemoryTrafficState()
+    add_intersection(state)
+    publisher = FakePublisher()
+    orchestrator = BackendOrchestrator(
+        state,
+        publisher,
+        controller=lambda system_state: Action(
+            intersection_id="signal-1",
+            phase_id=99,
+            reason="unsafe",
+            timestamp=datetime.now(UTC),
+        ),
+        signal_config_path=str(config),
+    )
+
+    assert orchestrator.tick() == []
+    assert publisher.commands == []
+
+
+def test_orchestrator_controls_only_configured_signal(tmp_path) -> None:
+    config = tmp_path / "signals.json"
+    config.write_text(
+        '{"signals":[{"signal_id":"signal-1","phases":[{"phase":0,"kind":"green","minimum_green_s":20,"yellow_s":0,"all_red_s":0},{"phase":1,"kind":"yellow","minimum_green_s":4,"yellow_s":4,"all_red_s":0},{"phase":2,"kind":"all_red","minimum_green_s":5,"yellow_s":0,"all_red_s":5}],"yellow_phase":1,"all_red_phase":2,"max_wait_s":120}]}',
+        encoding="utf-8",
+    )
+    state = InMemoryTrafficState()
+    timestamp = datetime.now(UTC)
+    for signal_id in ("signal-1", "signal-2"):
+        state.receive_intersection(
+            IntersectionState(
+                intersection_id=signal_id,
+                phase_id=0,
+                time_in_phase_s=30,
+                timestamp=timestamp,
+            )
+        )
+    publisher = FakePublisher()
+    orchestrator = BackendOrchestrator(
+        state,
+        publisher,
+        controller=lambda system_state: Action(
+            intersection_id=system_state.intersection_id,
+            phase_id=0,
+            reason="hold",
+            timestamp=timestamp,
+        ),
+        controlled_signal_ids=("signal-1",),
+        signal_config_path=str(config),
+    )
+
+    commands = orchestrator.tick()
+    assert [command.signal_id for command in commands] == ["signal-1"]

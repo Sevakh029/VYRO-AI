@@ -41,10 +41,27 @@ mqtt_message_handler = MQTTMessageHandler(
     AcknowledgementHandler(acknowledgement_bus),
 )
 mqtt_subscriber._on_message = mqtt_message_handler
+acknowledgement_bus.status_callback = lambda status: (
+    mqtt_message_handler.broadcast_status(status),
+    sqlite_message_logger.log_acknowledgement_status_async(status),
+)
 orchestrator = BackendOrchestrator(
     traffic_state,
     acknowledgement_bus,
     interval_s=float(os.getenv("VYRO_ORCHESTRATOR_INTERVAL_S", "1")),
+    controlled_signal_ids=(
+        id.strip()
+        for id in os.getenv(
+            "VYRO_CONTROLLED_SIGNAL_IDS",
+            "11144080253",
+        ).split(",")
+        if id.strip()
+    ),
+    signal_config_path=os.getenv(
+        "VYRO_SIGNALS_CONFIG",
+        str(__import__("pathlib").Path(__file__).resolve().parents[3] / "sim" / "signals.json"),
+    ),
+    decision_logger=sqlite_message_logger.log_decision_async,
 )
 
 

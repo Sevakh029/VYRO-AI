@@ -119,6 +119,31 @@ class SQLiteMessageLogger:
                         )
                         """
                     )
+                    connection.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS controller_decisions (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            signal_id TEXT NOT NULL,
+                            timestamp TEXT NOT NULL,
+                            state_phase INTEGER NOT NULL,
+                            time_in_phase_s REAL NOT NULL,
+                            pressure_per_phase TEXT NOT NULL,
+                            decisions TEXT NOT NULL
+                        )
+                        """
+                    )
+                    connection.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS acknowledgement_statuses (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            command_id TEXT,
+                            status TEXT NOT NULL,
+                            reason TEXT NOT NULL,
+                            payload TEXT NOT NULL,
+                            timestamp TEXT NOT NULL
+                        )
+                        """
+                    )
                 self._initialized = True
                 self.last_error = None
             except sqlite3.Error as exc:
@@ -256,6 +281,68 @@ class SQLiteMessageLogger:
             logger.exception("Failed to persist acknowledgment %s", ack.command_id)
             raise
 
+    def log_decision(self, decision: dict[str, object]) -> int:
+        self.initialize()
+        try:
+            with sqlite3.connect(self.database_path) as connection:
+                connection.execute("PRAGMA busy_timeout = 5000")
+                cursor = connection.execute(
+                    """
+                    INSERT INTO controller_decisions
+                        (signal_id, timestamp, state_phase, time_in_phase_s,
+                         pressure_per_phase, decisions)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(decision["signal_id"]),
+                        str(decision["timestamp"]),
+                        int(decision["state_phase"]),
+                        float(decision["time_in_phase_s"]),
+                        json.dumps(decision["pressure_per_phase"]),
+                        json.dumps(decision["decisions"]),
+                    ),
+                )
+                if cursor.lastrowid is None:
+                    raise RuntimeError("SQLite did not persist controller decision")
+                return cursor.lastrowid
+        except sqlite3.Error as exc:
+            self.last_error = str(exc)
+            logger.exception("Failed to persist controller decision")
+            raise
+
+    def log_acknowledgement_status(self, status: dict[str, object]) -> int:
+        self.initialize()
+        ack = status.get("ack")
+        command_id = (
+            str(ack.get("command_id"))
+            if isinstance(ack, dict) and ack.get("command_id") is not None
+            else None
+        )
+        try:
+            with sqlite3.connect(self.database_path) as connection:
+                connection.execute("PRAGMA busy_timeout = 5000")
+                cursor = connection.execute(
+                    """
+                    INSERT INTO acknowledgement_statuses
+                        (command_id, status, reason, payload, timestamp)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        command_id,
+                        str(status["status"]),
+                        str(status.get("reason", "")),
+                        json.dumps(status),
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
+                if cursor.lastrowid is None:
+                    raise RuntimeError("SQLite did not persist acknowledgement status")
+                return cursor.lastrowid
+        except sqlite3.Error as exc:
+            self.last_error = str(exc)
+            logger.exception("Failed to persist acknowledgement status")
+            raise
+
     def log_command_async(self, command: SignalCommand) -> Future[int]:
         if self._closed:
             self._reopen()
@@ -272,6 +359,33 @@ class SQLiteMessageLogger:
         if self._closed:
             self._reopen()
         future = self._executor.submit(self.log_acknowledgement, ack)
+        future.add_done_callback(
+            lambda completed: self._report_async_failure(
+                "vyro/v1/controller/ack",
+                completed,
+            )
+        )
+        return future
+
+    def log_decision_async(self, decision: dict[str, object]) -> Future[int]:
+        if self._closed:
+            self._reopen()
+        future = self._executor.submit(self.log_decision, decision)
+        future.add_done_callback(
+            lambda completed: self._report_async_failure(
+                "vyro/v1/controller/decision",
+                completed,
+            )
+        )
+        return future
+
+    def log_acknowledgement_status_async(
+        self,
+        status: dict[str, object],
+    ) -> Future[int]:
+        if self._closed:
+            self._reopen()
+        future = self._executor.submit(self.log_acknowledgement_status, status)
         future.add_done_callback(
             lambda completed: self._report_async_failure(
                 "vyro/v1/controller/ack",

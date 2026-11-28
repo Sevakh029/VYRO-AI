@@ -66,6 +66,7 @@ class Action:
     timestamp: datetime
     schema_version: str = "0.2"
     command_id: str | None = None
+    hold_s: float = 15.0
 
     def __post_init__(self) -> None:
         if not isinstance(self.intersection_id, str) or not self.intersection_id.strip():
@@ -87,6 +88,14 @@ class Action:
             raise ValueError("reason must be at most 256 characters")
         object.__setattr__(self, "reason", reason)
         _validate_utc_timestamp(self.timestamp)
+        if (
+            isinstance(self.hold_s, bool)
+            or not isinstance(self.hold_s, (int, float))
+            or not math.isfinite(self.hold_s)
+            or self.hold_s <= 0
+        ):
+            raise ValueError("hold_s must be a finite positive duration")
+        object.__setattr__(self, "hold_s", float(self.hold_s))
         if self.command_id is not None:
             if not isinstance(self.command_id, str) or not self.command_id.strip():
                 raise ValueError("command_id must not be empty")

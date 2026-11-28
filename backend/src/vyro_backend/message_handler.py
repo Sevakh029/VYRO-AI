@@ -130,3 +130,14 @@ class MQTTMessageHandler:
 
     def _schedule_broadcast(self, topic: str, message: dict[str, object]) -> None:
         asyncio.create_task(self.websocket_manager.broadcast({**message, "topic": topic}))
+
+    def broadcast_status(self, status: dict[str, object]) -> None:
+        with self._loop_lock:
+            loop = self._loop
+        if loop is not None and loop.is_running():
+            topic = str(status.get("topic", "vyro/v1/controller/ack"))
+            loop.call_soon_threadsafe(
+                self._schedule_broadcast,
+                topic,
+                status,
+            )

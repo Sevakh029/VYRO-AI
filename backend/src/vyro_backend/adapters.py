@@ -35,6 +35,7 @@ def command_to_action(message: SignalCommand) -> Action:
         timestamp=message.ts_utc,
         schema_version=message.schema_version,
         command_id=message.command_id,
+        hold_s=message.hold_s,
     )
 
 
@@ -43,7 +44,7 @@ def action_to_command(action: Action) -> SignalCommand:
         command_id=action.command_id or "",
         signal_id=action.intersection_id,
         phase=action.phase_id,
-        hold_s=15.0,
+        hold_s=action.hold_s,
         reason=action.reason,
         ts_utc=action.timestamp,
         schema_version=action.schema_version,

@@ -166,3 +166,39 @@ def test_invalid_ack_model_payload_is_rejected() -> None:
                 "ts_utc": "2026-11-24T10:00:00",
             }
         )
+
+
+def test_duplicate_acknowledgement_is_safe() -> None:
+    bus = CommandBus(lambda command: None)
+    command = bus.publish("signal-1", 1, 15, "pressure")
+    ack = ControllerAck(
+        command_id=command.command_id,
+        signal_id="signal-1",
+        phase=1,
+        hold_s=15,
+        applied=True,
+        reason="applied",
+        ts_utc=datetime.now(UTC),
+    )
+    assert bus.acknowledge(ack)
+    assert bus.acknowledge(ack) is False
+    assert bus.statuses[command.command_id]["status"] == "duplicate"
+    bus.close()
+
+
+def test_delayed_acknowledgement_after_timeout_is_recorded() -> None:
+    bus = CommandBus(lambda command: None, timeout_s=0.01)
+    command = bus.publish("signal-1", 1, 15, "pressure")
+    time.sleep(0.03)
+    ack = ControllerAck(
+        command_id=command.command_id,
+        signal_id="signal-1",
+        phase=1,
+        hold_s=15,
+        applied=True,
+        reason="applied late",
+        ts_utc=datetime.now(UTC),
+    )
+    assert bus.acknowledge(ack)
+    assert bus.statuses[command.command_id]["status"] == "delayed_applied"
+    bus.close()
