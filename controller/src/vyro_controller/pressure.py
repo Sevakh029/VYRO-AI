@@ -70,6 +70,8 @@ class PressureController:
         signal = self.signals.get(signal_id)
         if signal is None:
             return []
+        if not any(phase.phase == current_phase for phase in signal.phases):
+            return []
 
         scored: list[tuple[float, int]] = []
         for phase_config in signal.phases:
@@ -93,7 +95,11 @@ class PressureController:
             Action(
                 signal_id=signal_id,
                 phase=target,
-                hold_s=max(phase.min_green_s - elapsed, 0.001),
+                hold_s=(
+                    max(phase.min_green_s - elapsed, 0.001)
+                    if target == current_phase
+                    else max(phase.min_green_s, 0.001)
+                ),
                 reason=reason,
             )
         ]

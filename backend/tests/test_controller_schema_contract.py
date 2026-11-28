@@ -8,7 +8,9 @@ from vyro_backend.adapters import (
     state_to_intersection,
 )
 from vyro_backend.schemas import IntersectionState, SignalCommand
+from vyro_controller.decide import decide
 from vyro_controller.state import Action, SystemState
+from vyro_controller.types import parse_signals_config
 
 
 def test_controller_state_and_action_match_v02_message_shapes() -> None:
@@ -74,3 +76,40 @@ def test_schema_controller_adapters_round_trip_utc_messages() -> None:
     assert round_trip.hold_s == 15.0
     assert state.timestamp.utcoffset() == timedelta(0)
     assert action.timestamp.utcoffset() == timedelta(0)
+
+
+def test_backend_intersection_adapter_feeds_pressure_controller() -> None:
+    timestamp = datetime(2026, 11, 24, 10, tzinfo=UTC)
+    message = IntersectionState(
+        intersection_id="intersection-1",
+        phase_id=0,
+        time_in_phase_s=25,
+        detector_counts={"north": 1, "east": 8},
+        timestamp=timestamp,
+    )
+    config = parse_signals_config(
+        {
+            "signals": {
+                "intersection-1": {
+                    "phases": {
+                        "0": {
+                            "min_green_s": 10,
+                            "detectors": ["north"],
+                            "allowed_next": [1],
+                        },
+                        "1": {
+                            "min_green_s": 10,
+                            "detectors": ["east"],
+                            "allowed_next": [0],
+                        },
+                    }
+                }
+            }
+        }
+    )
+
+    actions = decide(intersection_to_state(message), config)
+
+    assert len(actions) == 1
+    assert actions[0].signal_id == message.intersection_id
+    assert actions[0].phase == 1

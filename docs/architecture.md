@@ -43,11 +43,11 @@ implemented in the running system.
 | Simulation bridge | P1 | Python | implemented for `VehicleState`; other commands planned |
 | Mosquitto MQTT broker | P1/P2 | Mosquitto config | implemented |
 | FastAPI, MQTT ingestion, state, WebSocket | P2/P3 | Python | implemented |
-| Estimator | P2/P3 | Python | proposed |
+| Estimator | P2 | Python | v0 implemented for counts and map-matched probe observations |
 | Detector and detector-count ingestion | P2/P3 | Pydantic / Python | simulated |
 | Controller library: Webster baseline | P2 | Python | implemented |
-| Controller phase selection | P2 | Python | proposed |
-| Safety validation and preemption coordination | P2/P3 | Python | simulated |
+| Controller phase selection | P2 | Python | pressure policy implemented |
+| Safety validation and preemption coordination | P2/P3 | Python | phase/minimum-green/transition validation implemented; preemption simulated |
 | Vehicle agents and synthetic advisories | P3 | Python | simulated |
 | SQLite message logging | P3 | Python / SQLite | implemented |
 | React dashboard and network map | P4 | JavaScript / TypeScript / React | implemented |
@@ -77,8 +77,8 @@ to v1.0 is not yet complete.
   900-veh/h demand, not measured traffic counts.
 - **Network completeness:** the selected OSM extract has clipped turn restrictions
   and disconnected fringe roads; its practical route coverage is not yet settled.
-- **Controller policy:** the current `decide()` API holds the observed phase; a
-  validated queue-pressure or Webster dynamic policy is proposed.
+- **Controller policy:** the initial queue-pressure policy and phase safety checks
+  are implemented; calibration against measured demand and SUMO remains future work.
 - **TraCI command integration:** MQTT command and acknowledgement schemas exist,
   but applying live phase changes and reporting end-to-end acknowledgements to
   SUMO remain planned.

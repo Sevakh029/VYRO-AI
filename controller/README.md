@@ -17,10 +17,13 @@ python -m pip install -e ".[dev]"
 
 - **Phase 0:** repository skeleton and test tooling.
 - **Day 1 P2:** Python dependencies, Webster/max-pressure reading notes, and toy-flow tests.
-- **Controller contract:** `SystemState` matches `IntersectionState`; `Action` matches
-  `SignalCommand`. See [state_spec.md](docs/state_spec.md).
-- **Decision stub:** `decide(state)` returns an action that holds the current phase;
-  phase selection is not implemented yet.
+- **Controller contract:** `SystemState` matches `IntersectionState`; pressure actions
+  are translated to `SignalCommand` by the backend orchestrator. See
+  [state_spec.md](docs/state_spec.md).
+- **Queue estimator:** `estimate_state()` fuses per-approach counts with stopped
+  probe observations near the stop line without using simulator ground truth.
+- **Pressure controller:** `decide()` selects only configured phases and rechecks
+  each result through the safety layer.
 - **Webster baseline:** `vyro_controller.webster` calculates bounded cycle lengths and
   minimum-green-constrained splits. The SUMO file adapter is in
   `sim/generate_fixed_time_plan.py`, outside the pure controller package.

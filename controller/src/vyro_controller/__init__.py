@@ -1,6 +1,7 @@
 """Pure-Python traffic-control library for VYRO."""
 
 from vyro_controller.decide import decide
+from vyro_controller.estimator import ProbeVehicle, estimate_queues, estimate_state
 from vyro_controller.pressure import PressureController, phase_pressure, weighted_queue_pressure
 from vyro_controller.safety import (
     allowed_phases,
@@ -36,6 +37,7 @@ __all__ = [
     "PhaseConfig",
     "PhaseFlow",
     "PressureController",
+    "ProbeVehicle",
     "SignalConfig",
     "SystemState",
     "TEST_SEEDS",
@@ -47,6 +49,8 @@ __all__ = [
     "clearance_for_transition",
     "calculate_webster_plan",
     "decide",
+    "estimate_queues",
+    "estimate_state",
     "is_allowed_phase",
     "max_wait_exceeded",
     "min_green_met",
